@@ -84,6 +84,26 @@ class SafeTextFileReader:
         chunk_size (int): Maximum lines per yielded chunk.
         buffer_size (int): Raw byte-read size used during streaming.
 
+    Examples:
+
+        Typical usage and tuning guidance::
+
+            # Default: sensible for many files (buffer_size=8192, chunk_size=500)
+            r = SafeTextFileReader('large.txt')
+
+            # Low-latency consumer: smaller logical chunks but default byte buffer
+            r = SafeTextFileReader('large.txt', chunk_size=10)
+            for chunk in r.read_as_stream():
+                process(chunk)
+
+            # High-throughput: larger byte buffer to reduce syscalls and large chunks
+            r = SafeTextFileReader('large.txt', buffer_size=65536, chunk_size=2000)
+            for chunk in r.read_as_stream():
+                bulk_process(chunk)
+
+            # Small files or memory constrained: reduce buffer_size (MIN_BUFFER_SIZE enforced)
+            r = SafeTextFileReader('small.txt', buffer_size=4096, chunk_size=50)
+
     Raises:
         SplurgeSafeIoFileNotFoundError: If the file does not exist.
         SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
@@ -277,6 +297,7 @@ class SafeTextFileReader:
         footer_buf: deque[str] = deque(maxlen=self.skip_footer_lines or 0)
         header_to_skip = self.skip_header_lines
         effective_chunk_size = self.chunk_size
+        byte_read_size = self.buffer_size
 
         chunk: list[str] = []
         carry = ""
@@ -292,7 +313,8 @@ class SafeTextFileReader:
         try:
             with self.file_path.open("rb") as fh:
                 while True:
-                    raw = fh.read(effective_chunk_size)
+                    # Read raw bytes using the configured byte buffer size.
+                    raw = fh.read(byte_read_size)
                     if not raw:
                         break
                     text = decoder.decode(raw)
