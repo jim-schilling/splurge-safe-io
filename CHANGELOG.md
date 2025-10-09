@@ -1,6 +1,16 @@
 ## Changelog
 
+
 ### [2025.0.1] - 2025-10-09
+#### Changed
+- Bump package version to `2025.0.1` in `pyproject.toml` and expose `__version__ = "2025.0.1"` in `splurge_safe_io/__init__.py`.
+- `splurge_safe_io/__init__.py` now explicitly imports and re-exports package exception classes (removed any wildcard exception import) and tidied the public exports.
+- `SafeTextFileReader` (`splurge_safe_io/safe_text_file_reader.py`):
+    - Default for `strip` is now False.
+    - Added a `buffer_size` constructor parameter and read-only `buffer_size` property (uses `DEFAULT_BUFFER_SIZE`/`MIN_BUFFER_SIZE` from constants).
+    - Enforce a minimum raw-read buffer size using `MIN_BUFFER_SIZE`.
+    - Fixed streaming implementation to use `buffer_size` for raw byte reads (previous behavior used the logical `chunk_size`).
+    - Improved Google-style docstrings and added usage examples to clarify tuning `buffer_size` vs `chunk_size`.
 
 
 ### [2025.0.0] - 2025-10-08
