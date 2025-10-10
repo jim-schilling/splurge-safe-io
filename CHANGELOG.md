@@ -2,6 +2,13 @@
 
 ### [2025.0.4] - 2025-10-10
 
+#### Added
+- `SafeTextFileReader.line_count()` — a memory-efficient helper to count logical lines. Uses a size threshold (default 64 MiB) to pick between a single full decode (small files) and the streaming reader (large files). The method intentionally ignores `skip_header_lines` and `skip_footer_lines` and validates that `threshold_bytes >= 1 MiB`.
+
+#### Added / Changed
+- Added and updated unit tests to cover `line_count()` behaviors for small and large files.
+- Replaced fragile direct attribute assignment patterns in tests (for example, `Path.stat = ...`) with `monkeypatch.setattr(...)` to make tests robust and isolated.
+- Resolved small lint and typing issues surfaced by `ruff` and `mypy` during development.
 
 ### [2025.0.3] - 2025-10-10
 #### Changed
