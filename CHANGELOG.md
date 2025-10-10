@@ -1,6 +1,11 @@
 ## Changelog
 
 
+### [2025.0.2] - 2025-10-09
+#### Fixed
+- Addressed an issue with buffer size calculation in `SafeTextFileReader` that could lead to incorrect line splitting. This fix prevents the reader from yielding empty string artifacts when reading files in chunks, ensuring that only actual lines from the source file are returned.
+- Added unit tests to cover edge cases related to chunk boundaries and line splitting to prevent regression.
+
 ### [2025.0.1] - 2025-10-09
 #### Changed
 - Bump package version to `2025.0.1` in `pyproject.toml` and expose `__version__ = "2025.0.1"` in `splurge_safe_io/__init__.py`.
