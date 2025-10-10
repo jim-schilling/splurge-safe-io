@@ -1,5 +1,18 @@
 ## Changelog
 
+### [2025.0.3] - 2025-10-10
+
+#### Changed
+- `SafeTextFileReader.preview()` now uses the streaming reader internally and will stop reading as soon as the requested number of preview lines are available for most encodings. Encodings that cannot be decoded incrementally (for example certain UTF-16 variants without a BOM) still fall back to a full read.
+- Default and minimum buffer sizes were increased to improve streaming throughput and reduce syscall overhead: `DEFAULT_BUFFER_SIZE` is now 32768 bytes and `MIN_BUFFER_SIZE` is now 16384 bytes.
+- Default preview length changed from 100 to 25 lines (`DEFAULT_PREVIEW_LINES = 25`).
+
+#### Added
+- Unit tests covering preview streaming behavior, header/footer skipping in previews, encoding-fallback behavior, and ensuring the reader releases OS file handles when preview returns early.
+
+#### Fixed
+- Small lint/type issues surfaced by `ruff` and `mypy` were resolved.
+- Updated docstrings and API reference to reflect the new defaults and streaming preview behavior.
 
 ### [2025.0.2] - 2025-10-09
 #### Fixed
