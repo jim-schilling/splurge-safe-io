@@ -105,16 +105,14 @@ SafeTextFileReader(
     skip_header_lines: int = 0,
     skip_footer_lines: int = 0,
     chunk_size: int = 500,
-    buffer_size: int = 8192,
+    buffer_size: int = 32768,
 )
 ```
 
 Methods:
 - `.read() -> list[str]`: Read full file and return normalized lines (LF newlines). Raises mapping exceptions above.
-- `.preview(max_lines: int = 100) -> list[str]`: Return first N normalized lines.
-- `.read_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 8192 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
-- `.preview(max_lines: int = 100) -> list[str]`: Return first N normalized lines.
-- `.read_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 8192 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 4096`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
+- `.preview(max_lines: int = 25) -> list[str]`: Return first N normalized lines. `preview()` uses the streaming reader internally and will stop reading as soon as `max_lines` lines are available for most encodings; for encodings that do not support incremental decoding the implementation falls back to a full read.
+- `.read_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 32768 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 16384`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
 
 Example:
 

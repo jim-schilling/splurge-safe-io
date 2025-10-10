@@ -71,11 +71,12 @@ class SafeTextFileReader:
             the file.
         chunk_size (int): Logical chunk size (maximum number of lines
             yielded by :meth:`read_as_stream`). Defaults to
-            :data:`splurge_safe_io.constants.DEFAULT_CHUNK_SIZE`.
+            :data:`splurge_safe_io.constants.DEFAULT_CHUNK_SIZE` (500).
         buffer_size (int | None): Raw byte read size used when streaming.
             If None, :data:`splurge_safe_io.constants.DEFAULT_BUFFER_SIZE`
-            is used. The implementation enforces a minimum buffer size of
-            :data:`splurge_safe_io.constants.MIN_BUFFER_SIZE`.
+            is used (currently 32768 bytes). The implementation enforces a
+            minimum buffer size of :data:`splurge_safe_io.constants.MIN_BUFFER_SIZE`
+            (16384 bytes) and will round up smaller requests.
 
     Attributes:
         file_path (pathlib.Path): Resolved path to the file.
@@ -88,7 +89,7 @@ class SafeTextFileReader:
 
         Typical usage and tuning guidance::
 
-            # Default: sensible for many files (buffer_size=8192, chunk_size=500)
+            # Default: sensible for many files (buffer_size=32768, chunk_size=500)
             r = SafeTextFileReader('large.txt')
 
             # Low-latency consumer: smaller logical chunks but default byte buffer
@@ -102,7 +103,9 @@ class SafeTextFileReader:
                 bulk_process(chunk)
 
             # Small files or memory constrained: reduce buffer_size (MIN_BUFFER_SIZE enforced)
-            r = SafeTextFileReader('small.txt', buffer_size=4096, chunk_size=50)
+            # Note: MIN_BUFFER_SIZE currently equals 16384 bytes, so smaller
+            # requests will be rounded up.
+            r = SafeTextFileReader('small.txt', buffer_size=16384, chunk_size=50)
 
     Raises:
         SplurgeSafeIoFileNotFoundError: If the file does not exist.
