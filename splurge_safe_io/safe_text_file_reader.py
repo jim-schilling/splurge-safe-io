@@ -242,33 +242,6 @@ class SafeTextFileReader:
             return [ln.strip() for ln in lines]
         return list(lines)
 
-    def preview(self, max_lines: int = DEFAULT_PREVIEW_LINES) -> list[str]:
-        """Return the first ``max_lines`` lines of the file after normalization.
-
-        Args:
-            max_lines (int): Maximum number of lines to return.
-
-        Returns:
-            list[str]: The first ``max_lines`` normalized lines.
-
-        Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
-        """
-        text = self._read()
-
-        normalized_text = text.replace("\r\n", CANONICAL_NEWLINE).replace("\r", CANONICAL_NEWLINE)
-        lines = normalized_text.splitlines()
-        if self.skip_header_lines:
-            lines = lines[self.skip_header_lines :]
-        if max_lines < 1:
-            return []
-        result = lines[:max_lines]
-        return [ln.strip() for ln in result] if self.strip else list(result)
-
     def read_as_stream(self) -> Iterator[list[str]]:
         """Yield chunks of normalized lines from the file.
 
@@ -444,6 +417,66 @@ class SafeTextFileReader:
             raise SplurgeSafeIoUnknownError(
                 f"Unexpected error reading file: {self.file_path}", details=str(e), original_exception=e
             ) from e
+
+    def preview(self, max_lines: int = DEFAULT_PREVIEW_LINES) -> list[str]:
+        """Return the first ``max_lines`` lines of the file after normalization.
+
+        Args:
+            max_lines (int): Maximum number of lines to return.
+
+        Returns:
+            list[str]: The first ``max_lines`` normalized lines.
+
+        Raises:
+            SplurgeSafeIoFileDecodingError: If decoding fails.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOsError: For unexpected OS-level errors.
+            SplurgeSafeIoUnknownError: For other unexpected errors.
+        """
+        # Avoid reading the entire file where possible by using the
+        # streaming reader and stopping as soon as we have enough lines.
+        if max_lines < 1:
+            return []
+
+        # Request a logical chunk size at least as large as the caller
+        # wants so we receive reasonably sized lists from the stream.
+        desired_chunk = max(max_lines, MIN_CHUNK_SIZE)
+
+        # Create a short-lived reader with the same configuration but
+        # tuned chunk_size so we don't mutate the current instance.
+        stream_reader = SafeTextFileReader(
+            self.file_path,
+            encoding=self.encoding,
+            strip=self.strip,
+            skip_header_lines=self.skip_header_lines,
+            skip_footer_lines=self.skip_footer_lines,
+            chunk_size=desired_chunk,
+            buffer_size=self.buffer_size,
+        )
+
+        collected: list[str] = []
+        gen = None
+        try:
+            gen = stream_reader.read_as_stream()
+            for chunk in gen:
+                for ln in chunk:
+                    collected.append(ln)
+                    if len(collected) >= max_lines:
+                        return collected[:max_lines]
+            return collected
+        finally:
+            # Ensure the generator is closed promptly so the underlying
+            # file descriptor is released if we returned early. Use
+            # getattr so mypy doesn't complain about Iterator not having
+            # a `.close()` attribute.
+            if gen is not None:
+                closer = getattr(gen, "close", None)
+                if closer is not None:
+                    try:
+                        closer()
+                    except Exception:
+                        pass
 
 
 @contextmanager
