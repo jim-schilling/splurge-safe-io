@@ -325,12 +325,25 @@ class SafeTextFileReader:
                     # str.splitlines() used by read().
                     working = carry + text
                     parts = working.splitlines(True)
-                    # Determine new carry: if last part ends with a newline,
-                    # there is no carry; otherwise last part is partial line.
-                    if parts and _newline_trail_re.search(parts[-1]):
-                        carry = ""
+                    # Determine new carry: if last part ends with a newline
+                    # sequence there is no carry. However, treat a lone
+                    # carriage-return ("\r") at the end as an *incomplete*
+                    # newline that should be carried into the next read. This
+                    # avoids the case where a CRLF sequence is split across
+                    # raw read boundaries and the leading LF becomes a
+                    # separate empty line in the next chunk.
+                    if parts:
+                        last_part = parts[-1]
+                        # If last_part ends with a single '\r' (not '\r\n')
+                        # consider it a partial line and keep it as carry.
+                        if last_part.endswith("\r") and not last_part.endswith("\r\n"):
+                            carry = parts.pop()
+                        elif _newline_trail_re.search(last_part):
+                            carry = ""
+                        else:
+                            carry = parts.pop()
                     else:
-                        carry = parts.pop() if parts else ""
+                        carry = ""
 
                     for part in parts:
                         # strip trailing newline sequences for consistency with read()
@@ -361,10 +374,19 @@ class SafeTextFileReader:
                 remaining = decoder.decode(b"", final=True)
                 final_working = carry + remaining
                 final_parts = final_working.splitlines(True) if final_working else []
-                if final_parts and _newline_trail_re.search(final_parts[-1]):
-                    final_carry = ""
+                # Final carry detection mirrors the main-loop logic: prefer
+                # to treat a lone trailing '\r' as an incomplete newline
+                # that should be preserved rather than consumed.
+                if final_parts:
+                    last_part = final_parts[-1]
+                    if last_part.endswith("\r") and not last_part.endswith("\r\n"):
+                        final_carry = final_parts.pop()
+                    elif _newline_trail_re.search(last_part):
+                        final_carry = ""
+                    else:
+                        final_carry = final_parts.pop()
                 else:
-                    final_carry = final_parts.pop() if final_parts else ""
+                    final_carry = ""
 
                 for part in final_parts:
                     part = _newline_trail_re.sub("", part)
