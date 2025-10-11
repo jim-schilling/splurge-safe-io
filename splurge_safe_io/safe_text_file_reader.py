@@ -45,6 +45,7 @@ from splurge_safe_io.exceptions import (
     SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoFilePermissionError,
     SplurgeSafeIoOsError,
+    SplurgeSafeIoParameterError,
     SplurgeSafeIoUnknownError,
 )
 from splurge_safe_io.path_validator import PathValidator
@@ -480,6 +481,86 @@ class SafeTextFileReader:
                         closer()
                     except Exception:
                         pass
+
+    def line_count(self, *, threshold_bytes: int = 64 * 1024 * 1024) -> int:
+        """Return the number of logical lines in the file.
+
+        This method is optimized for memory usage. It will inspect the
+        on-disk file size and, if the file is smaller than
+        ``threshold_bytes``, will decode the entire file once and count
+        logical lines. For larger files it iterates the streaming
+        reader to avoid building a full in-memory list of lines.
+
+        Important: this method intentionally ignores the instance's
+        `skip_header_lines` and `skip_footer_lines` settings and always
+        counts every logical line in the file.
+
+        Args:
+            threshold_bytes: Size threshold in bytes to decide between a
+                full decode (cheap for small files) and streaming (low
+                memory for large files). Defaults to 64 MiB.
+
+        Returns:
+            int: Number of logical lines in the file.
+
+        Raises: same exceptions as :meth:`_read` and :meth:`read_as_stream`
+        (mapped to the package exception types).
+        """
+        # Validate threshold is reasonable (prevent accidental tiny thresholds)
+        min_threshold = 1 * 1024 * 1024  # 1 MiB
+        if int(threshold_bytes) < min_threshold:
+            raise SplurgeSafeIoParameterError(f"threshold_bytes must be >= {min_threshold} (1 MiB)")
+
+        # Determine file size; fall back to streaming if unavailable.
+        try:
+            size = int(self.file_path.stat().st_size)
+        except OSError:
+            size = None
+
+        # If file is small, prefer a single decode path which is fast for
+        # small inputs and simpler to implement.
+        if size is not None and size <= int(threshold_bytes):
+            # For clarity, create a temporary reader configured to not
+            # skip headers/footers and call its public `.read()` method.
+            # This mirrors the decoding and normalization performed by
+            # the public API while making the intent explicit.
+            temp = SafeTextFileReader(
+                self.file_path,
+                encoding=self.encoding,
+                strip=False,
+                skip_header_lines=0,
+                skip_footer_lines=0,
+                chunk_size=self.chunk_size,
+                buffer_size=self.buffer_size,
+            )
+            lines = temp.read()
+            return len(lines)
+
+        # Large file (or stat failed): stream and count. Create a
+        # temporary reader that does not skip header/footer so that the
+        # count includes all lines.
+        stream_reader = SafeTextFileReader(
+            self.file_path,
+            encoding=self.encoding,
+            strip=False,
+            skip_header_lines=0,
+            skip_footer_lines=0,
+            chunk_size=self.chunk_size,
+            buffer_size=self.buffer_size,
+        )
+
+        total = 0
+        try:
+            for chunk in stream_reader.read_as_stream():
+                total += len(chunk)
+        finally:
+            # Nothing special to close here; read_as_stream uses context
+            # managers internally. If the implementation returns a
+            # generator with a close method it will be handled by the
+            # generator's finalizers.
+            pass
+
+        return total
 
 
 @contextmanager

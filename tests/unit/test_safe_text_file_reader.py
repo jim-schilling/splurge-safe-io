@@ -1,3 +1,9 @@
+import codecs
+from pathlib import Path
+
+import pytest
+
+from splurge_safe_io.exceptions import SplurgeSafeIoParameterError
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 
 
@@ -25,17 +31,14 @@ def test_preview_limits(tmp_path):
 
 
 def test_streaming_with_chunks_and_footer(tmp_path):
-    # create 10 lines
     p = tmp_path / "ten.txt"
     lines = [f"l{i}" for i in range(10)]
     p.write_text("\n".join(lines))
 
-    # skip last 2 as footer, chunk size 3
     r = SafeTextFileReader(p, chunk_size=3, skip_footer_lines=2)
     out = []
     for chunk in r.read_as_stream():
         out.extend(chunk)
-    # should have emitted 8 lines (10 - 2 footer)
     assert len(out) == 8
     assert out[-1] == "l7"
 
@@ -51,12 +54,10 @@ def test_streaming_header_skip(tmp_path):
 
 
 def test_preview_stops_early_without_full_read(tmp_path, monkeypatch):
-    # Create 100 lines
     p = tmp_path / "big.txt"
     lines = [f"l{i}" for i in range(100)]
     p.write_text("\n".join(lines))
 
-    # Prevent the full-read path from being called: _read should not be used
     def fail_read(self):
         raise AssertionError("_read should not be called for streaming preview")
 
@@ -64,18 +65,12 @@ def test_preview_stops_early_without_full_read(tmp_path, monkeypatch):
 
     r = SafeTextFileReader(p)
     preview = r.preview(max_lines=5)
-    assert len(preview) == 5
     assert preview == ["l0", "l1", "l2", "l3", "l4"]
 
 
 def test_preview_encoding_fallback_uses_full_read(tmp_path, monkeypatch):
-    # Prepare a file with a few lines encoded in utf-16-le
     p = tmp_path / "utf16.txt"
-    content_lines = ["a", "b", "c", "d"]
-    p.write_bytes("\n".join(content_lines).encode("utf-16-le"))
-
-    # Force the incremental decoder to raise UnicodeError so the
-    # read_as_stream fallback path is exercised.
+    p.write_bytes("\n".join(["a", "b", "c", "d"]).encode("utf-16-le"))
 
     class BrokenDecoder:
         def __init__(self, *args, **kwargs):
@@ -92,7 +87,6 @@ def test_preview_encoding_fallback_uses_full_read(tmp_path, monkeypatch):
 
     monkeypatch.setattr(__import__("codecs"), "getincrementaldecoder", broken_getinc)
 
-    # Spy on _read being called (full read)
     called = {"full": False}
     orig__read = SafeTextFileReader._read
 
@@ -102,7 +96,6 @@ def test_preview_encoding_fallback_uses_full_read(tmp_path, monkeypatch):
 
     monkeypatch.setattr(SafeTextFileReader, "_read", tracked_read)
 
-    # Use encoding that matches how we wrote the file for the final full read
     r = SafeTextFileReader(p, encoding="utf-16-le")
     preview = r.preview(max_lines=2)
     assert preview == ["a", "b"]
@@ -112,9 +105,6 @@ def test_preview_encoding_fallback_uses_full_read(tmp_path, monkeypatch):
 def test_preview_closes_filehandle_on_early_return(tmp_path, monkeypatch):
     p = tmp_path / "big2.txt"
     p.write_text("\n".join([f"x{i}" for i in range(50)]))
-
-    # Wrap Path.open to return a context manager that marks when closed
-    from pathlib import Path
 
     orig_open = Path.open
     marker = {"closed": False}
@@ -151,36 +141,28 @@ def test_preview_closes_filehandle_on_early_return(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "open", fake_open)
 
     r = SafeTextFileReader(p, chunk_size=10)
-    # Ask for a single line so preview returns early
     preview = r.preview(max_lines=1)
     assert preview == ["x0"]
-    # The fake context manager should have been closed when preview returned
     assert marker["closed"] is True
 
 
 def test_preview_respects_skip_header_lines(tmp_path, monkeypatch):
-    # Create file with header lines and body
     p = tmp_path / "hdr.txt"
     p.write_text("h1\nh2\nbody1\nbody2\nbody3\nbody4")
 
-    # Prevent the full-read path from being used
     def fail_read(self):
         raise AssertionError("_read should not be called for streaming preview with header skip")
 
     monkeypatch.setattr(SafeTextFileReader, "_read", fail_read)
 
-    # Ask for two preview lines but skip the two headers
     r = SafeTextFileReader(p, skip_header_lines=2)
     preview = r.preview(max_lines=2)
     assert preview == ["body1", "body2"]
 
 
 def test_preview_closes_filehandle_and_allows_deletion(tmp_path, monkeypatch):
-    # Similar to the previous closure test, but also attempt to delete the file
     p = tmp_path / "big3.txt"
     p.write_text("\n".join([f"y{i}" for i in range(50)]))
-
-    from pathlib import Path
 
     orig_open = Path.open
     marker = {"closed": False}
@@ -221,9 +203,92 @@ def test_preview_closes_filehandle_and_allows_deletion(tmp_path, monkeypatch):
     assert preview == ["y0"]
     assert marker["closed"] is True
 
-    # Try to delete the file to ensure no OS-level lock remains (Windows check)
     try:
         p.unlink()
     except Exception as e:
-        # If deletion failed, surface a helpful message for debugging
         raise AssertionError("File could not be deleted after preview; handle might still be open") from e
+
+
+def test_line_count_small_file_uses_full_read(tmp_path):
+    p = tmp_path / "small.txt"
+    content = "a\n b\n c\n"
+    p.write_bytes(content.encode("utf-8"))
+
+    r = SafeTextFileReader(p)
+    count = r.line_count(threshold_bytes=1024 * 1024)
+    assert count == 3
+
+
+def test_line_count_large_file_uses_streaming(tmp_path, monkeypatch):
+    p = tmp_path / "large.txt"
+    lines = [f"l{i}" for i in range(1000)]
+    p.write_text("\n".join(lines))
+
+    r = SafeTextFileReader(p)
+
+    class StatObj:
+        st_size = 2_000_000
+        import stat as _stat
+
+        st_mode = _stat.S_IFREG
+
+    def fail__read(self):
+        raise AssertionError("_read should not be called for streaming path")
+
+    monkeypatch.setattr(Path, "stat", lambda self, *a, **k: StatObj)
+    monkeypatch.setattr(SafeTextFileReader, "_read", fail__read)
+
+    count = r.line_count(threshold_bytes=1 * 1024 * 1024)
+    assert count == 1000
+
+
+def test_line_count_encoding_fallback_reads_full(tmp_path, monkeypatch):
+    p = tmp_path / "utf16-count.txt"
+    p.write_bytes("\n".join(["x", "y", "z"]).encode("utf-16-le"))
+
+    class BrokenDecoder:
+        def __init__(self, *a, **k):
+            pass
+
+        def decode(self, *a, **k):
+            raise UnicodeError("forced")
+
+        def __call__(self, *a, **k):
+            return self
+
+    def broken_getinc(name):
+        return BrokenDecoder
+
+    monkeypatch.setattr(codecs, "getincrementaldecoder", broken_getinc)
+
+    class StatObj:
+        st_size = 2_000_000
+        import stat as _stat
+
+        st_mode = _stat.S_IFREG
+
+    monkeypatch.setattr(Path, "stat", lambda self, *a, **k: StatObj)
+
+    # Spy on _read being called (full read) when incremental decoder fails
+    called = {"full": False}
+    orig__read = SafeTextFileReader._read
+
+    def tracked_read(self):
+        called["full"] = True
+        return orig__read(self)
+
+    monkeypatch.setattr(SafeTextFileReader, "_read", tracked_read)
+
+    r = SafeTextFileReader(p, encoding="utf-16-le")
+    count = r.line_count(threshold_bytes=1 * 1024 * 1024)
+
+    assert count == 3
+    assert called["full"] is True
+
+
+def test_line_count_rejects_small_threshold(tmp_path):
+    p = tmp_path / "t.txt"
+    p.write_text("1\n2\n3")
+    r = SafeTextFileReader(p)
+    with pytest.raises(SplurgeSafeIoParameterError):
+        r.line_count(threshold_bytes=512 * 1024)

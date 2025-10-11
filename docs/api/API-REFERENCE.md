@@ -114,6 +114,27 @@ Methods:
 - `.preview(max_lines: int = 25) -> list[str]`: Return first N normalized lines. `preview()` uses the streaming reader internally and will stop reading as soon as `max_lines` lines are available for most encodings; for encodings that do not support incremental decoding the implementation falls back to a full read.
 - `.read_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 32768 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 16384`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
 
+- `.line_count(threshold_bytes: int = 64 * 1024 * 1024) -> int`: Count the number of logical lines in the file in a memory-efficient way.
+
+    Description: This convenience method returns the total number of logical lines in the file. It intentionally ignores the instance-level `skip_header_lines` and `skip_footer_lines` settings and always counts every logical line on disk. To optimize for memory usage the implementation inspects the file size on disk:
+
+    - If the on-disk file size is less than or equal to `threshold_bytes`, the method performs a single full decode using the reader's decoding rules and returns `len(lines)`.
+    - If the on-disk file size is larger than `threshold_bytes`, the method reads the file using the streaming reader (`read_as_stream`) and accumulates the total line count without constructing a full in-memory list of all lines.
+
+    Notes:
+    - `threshold_bytes` defaults to 64 MiB. To avoid absurdly small thresholds the method requires `threshold_bytes >= 1 MiB` and will raise `SplurgeSafeIoParameterError` if a smaller value is passed.
+    - The implementation does not attempt any byte-level fast-path optimizations; it relies on the existing decoding and streaming machinery and will therefore behave consistently with `read()` and `read_as_stream()` with respect to newline normalization and decoding errors.
+    - If the streaming path encounters an incremental-decoder `UnicodeError`, it falls back to a full decode and returns the accurate line count.
+
+    Example:
+
+    ```py
+    from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
+
+    r = SafeTextFileReader('data.csv', encoding='utf-8')
+    total = r.line_count()  # default threshold 64 MiB
+    ```
+
 Example:
 
 ```py
