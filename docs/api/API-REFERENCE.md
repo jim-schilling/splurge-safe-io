@@ -93,7 +93,7 @@ p = PathValidator.validate_path('/data/foo.txt', must_exist=True, must_be_file=T
 
 ---
 
-## `splurge_safe_io.safe_text_file_reader.SafeTextFileReader`
+### `splurge_safe_io.safe_text_file_reader.SafeTextFileReader`
 
 Constructor:
 ```
@@ -109,6 +109,15 @@ SafeTextFileReader(
     buffer_size: int = 32768,
 )
 ```
+Arguments:
+- `file_path (Path | str)`: Path to the file to read.
+- `encoding (str)`: Text encoding for decoding. Defaults to 'utf-8'.
+- `strip (bool)`: If True, strip leading/trailing whitespace from each line. Defaults to False.
+- `skip_header_lines (int)`: Number of header lines to skip. Defaults to 0.
+- `skip_footer_lines (int)`: Number of footer lines to skip. Defaults to 0.
+- `skip_empty_lines (bool)`: Whether whitespace-only lines are removed from returned data. Defaults to False.
+- `chunk_size (int)`: Maximum number of lines per yielded chunk in `read_as_stream()`. Defaults to 500.
+- `buffer_size (int)`: Raw byte-read size used during streaming. Defaults to 32768 bytes.
 
 Methods:
 - `.read() -> list[str]`: Read full file and return normalized lines (LF newlines). Raises mapping exceptions above.
@@ -154,18 +163,28 @@ for chunk in r.read_as_stream():
 
 ---
 
-## `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter`
+### `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter`
 
 Constructor:
 ```
-SafeTextFileWriter(file_path: Path | str, *, file_write_mode: TextFileWriteMode = TextFileWriteMode.CREATE_OR_TRUNCATE, encoding: str = 'utf-8', canonical_newline: str = '\n')
+SafeTextFileWriter(
+    file_path: Path | str, 
+    *, 
+    file_write_mode: TextFileWriteMode = TextFileWriteMode.CREATE_OR_TRUNCATE, 
+    encoding: str = 'utf-8', canonical_newline: str = '\n'
+)
 ```
+Arguments:
+- `file_path (Path | str)`: Path to the file to write.
+- `file_write_mode (TextFileWriteMode)`: Write mode (default CREATE_OR_TRUNCATE).
+- `encoding (str)`: Text encoding for writing. Defaults to 'utf-8'.
+- `canonical_newline (str)`: Newline to use when normalizing input. Defaults to '\n'.
 
 Methods:
 - `.write(text: str) -> int`: Normalize newlines and write text.
-- `.writelines(lines: Iterable[str]) -> None`
-- `.flush() -> None`
-- `.close() -> None`
+- `.writelines(lines: Iterable[str]) -> None`: Write multiple lines, normalizing newlines.
+- `.flush() -> None`: Flush internal buffer to disk.
+- `.close() -> None`: Close the writer and release any resources.
 
 Context manager helper:
 - `open_safe_text_writer(file_path, *, encoding='utf-8', file_write_mode=TextFileWriteMode.CREATE_OR_TRUNCATE, canonical_newline='\n')` — yields an in-memory StringIO and writes normalized content to disk on successful exit.
@@ -178,6 +197,58 @@ from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 with open_safe_text_writer('out.txt') as buf:
     buf.write('one\r\ntwo\n')
 ```
+
+---
+
+### `splurge_safe_io.path_validator.PathValidator`
+
+
+Class/Static Methods:
+- `PathValidator.register_pre_resolution_policy(policy: Callable[[str | Path], None]) -> None`: Register a pre-resolution policy function. The function is called with the raw input path before any resolution or validation. Raise `SplurgeSafeIoPathValidationError` to reject the path.
+- `PathValidator.register_post_resolution_policy(policy: Callable[[Path], None]) -> None`: Register a post-resolution policy function. The function is called with the resolved path after validation. Raise `SplurgeSafeIoPathValidationError` to reject the path.
+- `PathValidator.register_validation_policy(policy: Callable[[Path], None]) -> None`: Register a validation policy function. The function is called with the resolved path after validation. Raise `SplurgeSafeIoPathValidationError` to reject the path.
+- `PathValidator.register_cleanup_policy(policy: Callable[[Path], None]) -> None`: Register a cleanup policy function. The function is called with the resolved path after all other processing. Raise `SplurgeSafeIoPathValidationError` to reject the path.
+- `PathValidator.clear_policies() -> None`: Clear all registered policies.
+- `PathValidator.get_registered_policies() -> dict[str, list[Callable]]`: Get a dictionary of registered policies by type.
+- `PathValidator.validate_path(
+    file_path: str | Path,
+    *,
+    must_exist: bool = False,
+    must_be_file: bool = False,
+    must_be_readable: bool = False,
+    must_be_writable: bool = False,
+    allow_relative: bool = True,
+    base_directory: str | Path | None = None,
+) -> pathlib.Path`: Validate a path for safety and platform correctness. Returns a resolved `Path` on success.
+`
+- `PathValidator.sanitize_path(file_path: str | Path) -> str`: Sanitize a path string by removing dangerous characters. Returns the sanitized path string.
+- `PathValidator.is_path_safe(file_path: str | Path) -> bool`: Check if a path string is safe (does not contain dangerous characters). Returns True if safe, False otherwise.
+
+---
+
+### `splurge_safe_io.constants`
+- `DEFAULT_BUFFER_SIZE` (int): Default buffer size for raw byte reads in `SafeTextFileReader`. Default is 32_768 bytes.
+- `MIN_BUFFER_SIZE` (int): Minimum buffer size for raw byte reads in `SafeTextFileReader`. Default is 16_384 bytes.
+- `DEFAULT_PREVIEW_LINES` (int): Default number of lines to return in `SafeTextFileReader.preview()`. Default is 25 lines.
+- `DEFAULT_CHUNK_SIZE` (int): Default chunk size for `SafeTextFileReader.read_as_stream()`. Default is 500 lines.
+- `MIN_CHUNK_SIZE` (int): Minimum chunk size for `SafeTextFileReader.read_as_stream()`. Default is 10 lines.
+- `DEFAULT_ENCODING` (str): Default text encoding. Default is 'utf-8'.
+- `CANONICAL_NEWLINE` (str): Canonical newline character used for normalization. Default is '\n'.
+
+
+### `splurge_safe_io.exceptions`
+- `SplurgeSafeIoError` — base class for all splurge-safe-io exceptions.
+- `SplurgeSafeIoFileOperationError` — base class for file operation errors.
+    - `SplurgeSafeIoFileNotFoundError` — file not found.
+    - `SplurgeSafeIoFilePermissionError` — permission denied.
+    - `SplurgeSafeIoFileDecodingError` — decoding error.
+    - `SplurgeSafeIoFileEncodingError` — encoding error.
+    - `SplurgeSafeIoFileAlreadyExistsError` — file already exists.
+    - `SplurgeSafeIoStreamingError` — streaming error.
+    - `SplurgeSafeIoOsError` — generic OS error.
+- `SplurgeSafeIoPathValidationError` — path validation error.
+- `SplurgeSafeIoParameterError` — invalid parameter error.
+- `SplurgeSafeIoUnknownError` — unknown error.
 
 ---
 

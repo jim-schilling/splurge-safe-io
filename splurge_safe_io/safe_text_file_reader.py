@@ -70,6 +70,8 @@ class SafeTextFileReader:
             the file.
         skip_footer_lines (int): Number of lines to skip from the end of
             the file.
+        skip_empty_lines (bool): If True, skip lines that are empty or
+            contain only whitespace. Defaults to False.
         chunk_size (int): Logical chunk size (maximum number of lines
             yielded by :meth:`read_as_stream`). Defaults to
             :data:`splurge_safe_io.constants.DEFAULT_CHUNK_SIZE` (500).
@@ -83,6 +85,9 @@ class SafeTextFileReader:
         file_path (pathlib.Path): Resolved path to the file.
         encoding (str): Encoding used for decoding.
         strip (bool): Whether whitespace stripping is enabled.
+        skip_header_lines (int): Number of header lines to skip.
+        skip_footer_lines (int): Number of footer lines to skip.
+        skip_empty_lines (bool): Whether whitespace-only lines are removed from returned data.
         chunk_size (int): Maximum lines per yielded chunk.
         buffer_size (int): Raw byte-read size used during streaming.
 
