@@ -35,6 +35,22 @@ print(r.read())
 
 with open_safe_text_writer('out.txt') as buf:
     buf.write('a\n b\n')
+
+Small usage: skipping empty/whitespace-only lines
+
+```py
+from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
+
+# example.txt contains blank lines and whitespace-only lines
+r = SafeTextFileReader('example.txt', skip_empty_lines=True)
+for chunk in r.read_as_stream():
+    for line in chunk:
+        print(line)
+
+# Quick preview returning first 5 non-empty lines
+preview = r.preview(5)
+print(preview)
+```
 ```
 
 Detailed examples

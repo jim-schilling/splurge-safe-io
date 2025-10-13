@@ -292,3 +292,163 @@ def test_line_count_rejects_small_threshold(tmp_path):
     r = SafeTextFileReader(p)
     with pytest.raises(SplurgeSafeIoParameterError):
         r.line_count(threshold_bytes=512 * 1024)
+
+
+def test_streaming_large_file_skip_empty_lines_behavior(tmp_path, monkeypatch):
+    """Create a temporary file >1MiB, force streaming, and validate behavior
+    of read_as_stream(), line_count(), and preview() with skip_empty_lines
+    True and False.
+    """
+    p = tmp_path / "large_mixed.txt"
+
+    # Build content mixing non-empty, empty, and whitespace-only lines until
+    # we exceed ~1.2 MiB to ensure a realistically large file (but keep write
+    # time bounded for CI).
+    parts = []
+    total = 0
+    i = 0
+    target = 1_200_000
+    pattern = ["data-{}", "", "   ", "more-{}", ""]
+    while total < target:
+        for pat in pattern:
+            if "{}" in pat:
+                s = pat.format(i)
+            else:
+                s = pat
+            parts.append(s)
+            total += len(s) + 1  # +1 for newline when joined
+        i += 1
+
+    content = "\n".join(parts)
+    p.write_bytes(content.encode("utf-8"))
+
+    # Fake an on-disk size large enough so the implementation chooses the
+    # streaming path (avoid creating a 64+ MiB file in the test).
+    class StatObj:
+        st_size = 2_000_000
+        import stat as _stat
+
+        st_mode = _stat.S_IFREG
+
+    monkeypatch.setattr(Path, "stat", lambda self, *a, **k: StatObj)
+
+    # First: skip_empty_lines = True
+    r_true = SafeTextFileReader(p, skip_empty_lines=True)
+    collected_true: list[str] = []
+    for chunk in r_true.read_as_stream():
+        collected_true.extend(chunk)
+
+    # Build expected sequences using the same normalization the reader uses
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    expected_all = normalized.splitlines()
+    expected_non_empty = [s for s in expected_all if s.strip() != ""]
+
+    # Exact match: collected (streamed) non-empty lines should equal expected
+    assert collected_true == expected_non_empty
+
+    # line_count should match the number of non-empty logical lines
+    count_true = r_true.line_count()
+    assert count_true == len(expected_non_empty)
+
+    # preview should return the first N non-empty lines
+    preview_true = r_true.preview(5)
+    assert preview_true == expected_non_empty[:5]
+
+    # Second: skip_empty_lines = False (default)
+    r_false = SafeTextFileReader(p, skip_empty_lines=False)
+    collected_false: list[str] = []
+    for chunk in r_false.read_as_stream():
+        collected_false.extend(chunk)
+
+    # Exact match: streamed output should equal the original logical lines
+    assert collected_false == expected_all
+
+    count_false = r_false.line_count()
+    assert count_false == len(expected_all)
+
+    preview_false = r_false.preview(5)
+    # Preview should return the first 5 logical lines (may include empties)
+    assert preview_false == expected_all[:5]
+
+
+def test_streaming_large_file_skip_empty_lines_behavior_utf16(tmp_path, monkeypatch):
+    """Same as test_streaming_large_file_skip_empty_lines_behavior but
+    the file is written in UTF-16-LE and the incremental decoder is forced
+    to fail so the streaming implementation falls back to a full read.
+    """
+    p = tmp_path / "large_mixed_utf16.txt"
+
+    parts = []
+    total = 0
+    i = 0
+    target = 1_200_000
+    pattern = ["data-{}", "", "   ", "more-{}", ""]
+    while total < target:
+        for pat in pattern:
+            if "{}" in pat:
+                s = pat.format(i)
+            else:
+                s = pat
+            parts.append(s)
+            total += len(s) + 1
+        i += 1
+
+    content = "\n".join(parts)
+    # write as utf-16-le bytes
+    p.write_bytes(content.encode("utf-16-le"))
+
+    # Force incremental decoder to raise to trigger fallback to full read
+    class BrokenDecoder:
+        def __init__(self, *a, **k):
+            pass
+
+        def decode(self, *a, **k):
+            raise UnicodeError("forced")
+
+        def __call__(self, *a, **k):
+            return self
+
+    def broken_getinc(name):
+        return BrokenDecoder
+
+    monkeypatch.setattr(codecs, "getincrementaldecoder", broken_getinc)
+
+    class StatObj:
+        st_size = 2_000_000
+        import stat as _stat
+
+        st_mode = _stat.S_IFREG
+
+    monkeypatch.setattr(Path, "stat", lambda self, *a, **k: StatObj)
+
+    # First: skip_empty_lines = True
+    r_true = SafeTextFileReader(p, skip_empty_lines=True, encoding="utf-16-le")
+    collected_true: list[str] = []
+    for chunk in r_true.read_as_stream():
+        collected_true.extend(chunk)
+
+    normalized = content.replace("\r\n", "\n").replace("\r", "\n")
+    expected_all = normalized.splitlines()
+    expected_non_empty = [s for s in expected_all if s.strip() != ""]
+
+    assert collected_true == expected_non_empty
+
+    count_true = r_true.line_count()
+    assert count_true == len(expected_non_empty)
+
+    preview_true = r_true.preview(5)
+    assert preview_true == expected_non_empty[:5]
+
+    # Second: skip_empty_lines = False
+    r_false = SafeTextFileReader(p, skip_empty_lines=False, encoding="utf-16-le")
+    collected_false: list[str] = []
+    for chunk in r_false.read_as_stream():
+        collected_false.extend(chunk)
+
+    assert collected_false == expected_all
+
+    count_false = r_false.line_count()
+    assert count_false == len(expected_all)
+
+    preview_false = r_false.preview(5)
+    assert preview_false == expected_all[:5]

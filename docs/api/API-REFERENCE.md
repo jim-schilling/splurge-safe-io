@@ -104,6 +104,7 @@ SafeTextFileReader(
     strip: bool = False,
     skip_header_lines: int = 0,
     skip_footer_lines: int = 0,
+    skip_empty_lines: bool = False,
     chunk_size: int = 500,
     buffer_size: int = 32768,
 )
@@ -134,6 +135,10 @@ Methods:
     r = SafeTextFileReader('data.csv', encoding='utf-8')
     total = r.line_count()  # default threshold 64 MiB
     ```
+
+Note: `skip_empty_lines` (bool) may be passed to the constructor and, when True,
+causes the reader to filter out whitespace-only lines from `read()`,
+`read_as_stream()`, `preview()` and `line_count()`.
 
 Example:
 

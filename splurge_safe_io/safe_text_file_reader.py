@@ -122,6 +122,7 @@ class SafeTextFileReader:
         strip: bool = False,
         skip_header_lines: int = 0,
         skip_footer_lines: int = 0,
+        skip_empty_lines: bool = False,
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         buffer_size: int = DEFAULT_BUFFER_SIZE,
     ) -> None:
@@ -132,6 +133,7 @@ class SafeTextFileReader:
         self._strip = strip
         self._skip_header_lines = max(skip_header_lines, 0)
         self._skip_footer_lines = max(skip_footer_lines, 0)
+        self._skip_empty_lines = bool(skip_empty_lines)
         self._chunk_size = max(chunk_size, MIN_CHUNK_SIZE)
         # buffer_size controls the raw byte-read size when streaming.
         self._buffer_size = max(buffer_size, MIN_BUFFER_SIZE)
@@ -160,6 +162,11 @@ class SafeTextFileReader:
     def skip_footer_lines(self) -> int:
         """Number of footer lines to skip."""
         return int(self._skip_footer_lines)
+
+    @property
+    def skip_empty_lines(self) -> bool:
+        """Whether whitespace-only lines are removed from returned data."""
+        return bool(self._skip_empty_lines)
 
     @property
     def chunk_size(self) -> int:
@@ -241,6 +248,10 @@ class SafeTextFileReader:
             if self.skip_footer_lines >= len(lines):
                 return []
             lines = lines[: -self.skip_footer_lines]
+
+        # Apply empty-line filtering based on whitespace-only content
+        if self.skip_empty_lines:
+            lines = [ln for ln in lines if ln.strip() != ""]
 
         if self.strip:
             return [ln.strip() for ln in lines]
@@ -324,27 +335,32 @@ class SafeTextFileReader:
 
                     for part in parts:
                         # strip trailing newline sequences for consistency with read()
-                        line = _newline_trail_re.sub("", part)
-                        if self.strip:
-                            line = line.strip()
+                        raw_line = _newline_trail_re.sub("", part)
+                        is_empty = raw_line.strip() == ""
+                        out_line = raw_line.strip() if self.strip else raw_line
 
-                        # Handle header skipping
+                        # Handle header skipping (positional on raw lines)
                         if header_to_skip > 0:
                             header_to_skip -= 1
                             continue
 
-                        # If we have footer lines to skip, buffer them
+                        # Buffer footer lines using the raw form so footer
+                        # skipping remains positional.
                         if self.skip_footer_lines:
-                            footer_buf.append(line)
+                            footer_buf.append(raw_line)
                             # If buffer is full, the leftmost item is safe to emit
                             if len(footer_buf) == footer_buf.maxlen:
-                                emit_line = footer_buf.popleft()
-                                chunk.append(emit_line)
+                                emit_raw = footer_buf.popleft()
+                                if not (self.skip_empty_lines and emit_raw.strip() == ""):
+                                    emit_out = emit_raw.strip() if self.strip else emit_raw
+                                    chunk.append(emit_out)
                         else:
-                            chunk.append(line)
+                            if not (self.skip_empty_lines and is_empty):
+                                chunk.append(out_line)
 
                         if len(chunk) >= effective_chunk_size:
-                            yield chunk
+                            if chunk:
+                                yield chunk
                             chunk = []
 
                 # Finalize decoding to get any remaining text
@@ -366,29 +382,34 @@ class SafeTextFileReader:
                     final_carry = ""
 
                 for part in final_parts:
-                    part = _newline_trail_re.sub("", part)
-                    if self.strip:
-                        part = part.strip()
+                    raw_line = _newline_trail_re.sub("", part)
+                    is_empty = raw_line.strip() == ""
+                    out_line = raw_line.strip() if self.strip else raw_line
                     if header_to_skip > 0:
                         header_to_skip -= 1
                         continue
                     if self.skip_footer_lines:
-                        footer_buf.append(part)
+                        footer_buf.append(raw_line)
                         if len(footer_buf) == footer_buf.maxlen:
-                            chunk.append(footer_buf.popleft())
+                            emit_raw = footer_buf.popleft()
+                            if not (self.skip_empty_lines and emit_raw.strip() == ""):
+                                emit_out = emit_raw.strip() if self.strip else emit_raw
+                                chunk.append(emit_out)
                     else:
-                        chunk.append(part)
+                        if not (self.skip_empty_lines and is_empty):
+                            chunk.append(out_line)
 
                 # Emit the final carry as a line if present
                 if final_carry:
-                    part = _newline_trail_re.sub("", final_carry)
-                    if self.strip:
-                        part = part.strip()
+                    raw_line = _newline_trail_re.sub("", final_carry)
+                    is_empty = raw_line.strip() == ""
+                    out_line = raw_line.strip() if self.strip else raw_line
                     if header_to_skip <= 0:
                         if self.skip_footer_lines:
-                            footer_buf.append(part)
+                            footer_buf.append(raw_line)
                         else:
-                            chunk.append(part)
+                            if not (self.skip_empty_lines and is_empty):
+                                chunk.append(out_line)
 
                 # After EOF, footer_buf contains the footer lines (or fewer if file smaller)
                 # Do not emit footer lines — they are intentionally skipped.
@@ -455,6 +476,7 @@ class SafeTextFileReader:
             strip=self.strip,
             skip_header_lines=self.skip_header_lines,
             skip_footer_lines=self.skip_footer_lines,
+            skip_empty_lines=self.skip_empty_lines,
             chunk_size=desired_chunk,
             buffer_size=self.buffer_size,
         )
@@ -530,6 +552,7 @@ class SafeTextFileReader:
                 strip=False,
                 skip_header_lines=0,
                 skip_footer_lines=0,
+                skip_empty_lines=self.skip_empty_lines,
                 chunk_size=self.chunk_size,
                 buffer_size=self.buffer_size,
             )
@@ -545,6 +568,7 @@ class SafeTextFileReader:
             strip=False,
             skip_header_lines=0,
             skip_footer_lines=0,
+            skip_empty_lines=self.skip_empty_lines,
             chunk_size=self.chunk_size,
             buffer_size=self.buffer_size,
         )

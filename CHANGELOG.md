@@ -1,5 +1,17 @@
 ## Changelog
 
+### [2025.0.5] - 2025-10-13
+
+#### Added
+- Support for `skip_empty_lines` parameter in `SafeTextFileReader` to filter out whitespace-only lines during read operations.
+- New unit tests to cover the behavior of `skip_empty_lines` in various methods (`read()`, `read_as_stream()`, `preview()`, and `line_count()`).
+- Updated documentation in `docs/api/API-REFERENCE.md` to include `skip_empty_lines` parameter details and examples.
+
+#### Documentation
+- Added a short usage example to `docs/README-DETAILS.md` demonstrating `skip_empty_lines=True` with `read_as_stream()` and `preview()`.
+
+
+
 ### [2025.0.4] - 2025-10-10
 
 #### Added
@@ -9,6 +21,7 @@
 - Added and updated unit tests to cover `line_count()` behaviors for small and large files.
 - Replaced fragile direct attribute assignment patterns in tests (for example, `Path.stat = ...`) with `monkeypatch.setattr(...)` to make tests robust and isolated.
 - Resolved small lint and typing issues surfaced by `ruff` and `mypy` during development.
+
 
 ### [2025.0.3] - 2025-10-10
 #### Changed
@@ -23,10 +36,12 @@
 - Small lint/type issues surfaced by `ruff` and `mypy` were resolved.
 - Updated docstrings and API reference to reflect the new defaults and streaming preview behavior.
 
+
 ### [2025.0.2] - 2025-10-09
 #### Fixed
 - Addressed an issue with buffer size calculation in `SafeTextFileReader` that could lead to incorrect line splitting. This fix prevents the reader from yielding empty string artifacts when reading files in chunks, ensuring that only actual lines from the source file are returned.
 - Added unit tests to cover edge cases related to chunk boundaries and line splitting to prevent regression.
+
 
 ### [2025.0.1] - 2025-10-09
 #### Changed
