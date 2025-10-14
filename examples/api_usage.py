@@ -50,7 +50,7 @@ def demo_write_and_read(tmp_dir: Path) -> None:
 
     # Read back with SafeTextFileReader (normalizes newlines, strips by default)
     reader = SafeTextFileReader(dest, encoding="utf-8", strip=True)
-    lines = reader.read()
+    lines = reader.readlines()
     print("Read lines:")
     for ln in lines:
         print(repr(ln))
@@ -67,7 +67,7 @@ def demo_streaming(tmp_dir: Path) -> None:
 
     reader = SafeTextFileReader(dest, chunk_size=100, strip=False)
     chunk_count = 0
-    for _ in reader.read_as_stream():
+    for _ in reader.readlines_as_stream():
         chunk_count += 1
     print(f"Streamed in {chunk_count} chunks (chunk_size={reader.chunk_size})")
 
@@ -77,7 +77,7 @@ def demo_error_inspection(tmp_dir: Path) -> None:
     missing = tmp_dir / "does-not-exist.txt"
 
     try:
-        SafeTextFileReader(missing).read()
+        SafeTextFileReader(missing).readlines()
     except SplurgeSafeIoFileNotFoundError as err:
         print("Caught mapped FileNotFoundError -> SplurgeSafeIoFileNotFoundError")
         print("message:", err.message)
