@@ -1,5 +1,16 @@
 ## Changelog
 
+### [2025.0.6] - 2025-10-14
+
+#### Added
+- New methods `SafeTextFileReader.readlines()` and `SafeTextFileReader.readlines_as_stream()` to provide clearer API naming that matches Python's standard `file.readlines()` semantics.
+
+#### Changed
+- `SafeTextFileReader.read()` and `SafeTextFileReader.read_as_stream()` are now deprecated and will be removed in version 2025.1.0. Use `readlines()` and `readlines_as_stream()` instead.
+- Updated documentation and examples to use the new preferred method names.
+- In version 2025.1.0, `read()` will be repurposed to return the raw file content as a single string (matching Python's `file.read()` semantics).
+
+
 ### [2025.0.5] - 2025-10-13
 
 #### Added

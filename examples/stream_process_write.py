@@ -39,7 +39,7 @@ def process_file(
     reader = SafeTextFileReader(src, chunk_size=chunk_size, skip_empty_lines=skip_empty_lines)
     written = 0
     with open_safe_text_writer(dst, encoding="utf-8") as out_buf:
-        for chunk in reader.read_as_stream():
+        for chunk in reader.readlines_as_stream():
             out_buf.writelines(transform(ln) for ln in chunk)
             written += len(chunk)
     return written

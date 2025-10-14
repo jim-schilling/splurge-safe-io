@@ -27,7 +27,7 @@ from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 # Read lines
 reader = SafeTextFileReader('data.csv')
-rows = reader.read()
+rows = reader.readlines()
 
 # Write via context manager
 with open_safe_text_writer('out.txt') as buf:

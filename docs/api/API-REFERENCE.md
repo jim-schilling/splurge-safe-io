@@ -116,24 +116,26 @@ Arguments:
 - `skip_header_lines (int)`: Number of header lines to skip. Defaults to 0.
 - `skip_footer_lines (int)`: Number of footer lines to skip. Defaults to 0.
 - `skip_empty_lines (bool)`: Whether whitespace-only lines are removed from returned data. Defaults to False.
-- `chunk_size (int)`: Maximum number of lines per yielded chunk in `read_as_stream()`. Defaults to 500.
+- `chunk_size (int)`: Maximum number of lines per yielded chunk in `readlines_as_stream()`. Defaults to 500.
 - `buffer_size (int)`: Raw byte-read size used during streaming. Defaults to 32768 bytes.
 
 Methods:
-- `.read() -> list[str]`: Read full file and return normalized lines (LF newlines). Raises mapping exceptions above.
+- `.readlines() -> list[str]`: Read full file and return normalized lines (LF newlines). Raises mapping exceptions above.
+- `.readlines_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 32768 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 16384`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
 - `.preview(max_lines: int = 25) -> list[str]`: Return first N normalized lines. `preview()` uses the streaming reader internally and will stop reading as soon as `max_lines` lines are available for most encodings; for encodings that do not support incremental decoding the implementation falls back to a full read.
-- `.read_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 32768 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 16384`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
+- `.read() -> list[str]`: **Deprecated**. Use `readlines()` instead. This method will be repurposed in version 2025.1.0 to return raw file content as a string.
+- `.read_as_stream() -> Iterator[list[str]]`: **Deprecated**. Use `readlines_as_stream()` instead. This method will be removed in version 2025.1.0.
 
 - `.line_count(threshold_bytes: int = 64 * 1024 * 1024) -> int`: Count the number of logical lines in the file in a memory-efficient way.
 
     Description: This convenience method returns the total number of logical lines in the file. It intentionally ignores the instance-level `skip_header_lines` and `skip_footer_lines` settings and always counts every logical line on disk. To optimize for memory usage the implementation inspects the file size on disk:
 
     - If the on-disk file size is less than or equal to `threshold_bytes`, the method performs a single full decode using the reader's decoding rules and returns `len(lines)`.
-    - If the on-disk file size is larger than `threshold_bytes`, the method reads the file using the streaming reader (`read_as_stream`) and accumulates the total line count without constructing a full in-memory list of all lines.
+    - If the on-disk file size is larger than `threshold_bytes`, the method reads the file using the streaming reader (`readlines_as_stream`) and accumulates the total line count without constructing a full in-memory list of all lines.
 
     Notes:
     - `threshold_bytes` defaults to 64 MiB. To avoid absurdly small thresholds the method requires `threshold_bytes >= 1 MiB` and will raise `SplurgeSafeIoParameterError` if a smaller value is passed.
-    - The implementation does not attempt any byte-level fast-path optimizations; it relies on the existing decoding and streaming machinery and will therefore behave consistently with `read()` and `read_as_stream()` with respect to newline normalization and decoding errors.
+    - The implementation does not attempt any byte-level fast-path optimizations; it relies on the existing decoding and streaming machinery and will therefore behave consistently with `readlines()` and `readlines_as_stream()` with respect to newline normalization and decoding errors.
     - If the streaming path encounters an incremental-decoder `UnicodeError`, it falls back to a full decode and returns the accurate line count.
 
     Example:
@@ -146,8 +148,8 @@ Methods:
     ```
 
 Note: `skip_empty_lines` (bool) may be passed to the constructor and, when True,
-causes the reader to filter out whitespace-only lines from `read()`,
-`read_as_stream()`, `preview()` and `line_count()`.
+causes the reader to filter out whitespace-only lines from `readlines()`,
+`readlines_as_stream()`, `preview()` and `line_count()`.
 
 Example:
 
@@ -155,8 +157,8 @@ Example:
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 
 r = SafeTextFileReader('data.txt', encoding='utf-8')
-lines = r.read()
-for chunk in r.read_as_stream():
+lines = r.readlines()
+for chunk in r.readlines_as_stream():
     for ln in chunk:
         print(ln)
 ```
@@ -230,8 +232,8 @@ Class/Static Methods:
 - `DEFAULT_BUFFER_SIZE` (int): Default buffer size for raw byte reads in `SafeTextFileReader`. Default is 32_768 bytes.
 - `MIN_BUFFER_SIZE` (int): Minimum buffer size for raw byte reads in `SafeTextFileReader`. Default is 16_384 bytes.
 - `DEFAULT_PREVIEW_LINES` (int): Default number of lines to return in `SafeTextFileReader.preview()`. Default is 25 lines.
-- `DEFAULT_CHUNK_SIZE` (int): Default chunk size for `SafeTextFileReader.read_as_stream()`. Default is 500 lines.
-- `MIN_CHUNK_SIZE` (int): Minimum chunk size for `SafeTextFileReader.read_as_stream()`. Default is 10 lines.
+- `DEFAULT_CHUNK_SIZE` (int): Default chunk size for `SafeTextFileReader.readlines_as_stream()`. Default is 500 lines.
+- `MIN_CHUNK_SIZE` (int): Minimum chunk size for `SafeTextFileReader.readlines_as_stream()`. Default is 10 lines.
 - `DEFAULT_ENCODING` (str): Default text encoding. Default is 'utf-8'.
 - `CANONICAL_NEWLINE` (str): Canonical newline character used for normalization. Default is '\n'.
 
