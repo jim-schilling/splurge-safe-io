@@ -114,6 +114,6 @@ def test_read_as_stream_unicode_fallback(monkeypatch, tmp_path):
 
     reader = SafeTextFileReader(p, encoding="utf-16", chunk_size=2)
     collected = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         collected.extend(chunk)
     assert collected == ["a", "b", "c"]

@@ -1,5 +1,23 @@
 ## Changelog
 
+### [2025.1.0] - 2025-10-14
+
+#### Removed
+- `SafeTextFileReader.read_as_stream()` has been deleted.
+
+#### Refactored
+- `SafeTextFileReader.read()` now returns the normalized file contents as a single string.
+
+#### Added
+- More edge cases have been added to validate `SafeTextFileReader`:
+   - Parameter Interaction
+   - File Content
+   - Streaming
+
+#### Updated
+- Many tests have been refactored to use `SafeTextFileReader.read()` for reading entire file contents
+   - `SafeTextFileReader().read()` calls `SafeTextFileReader.readlines()` directly, so both methods are validated.
+
 ### [2025.0.6] - 2025-10-14
 
 #### Added

@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import codecs
 import re
-import warnings
 from collections import deque
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -226,17 +225,13 @@ class SafeTextFileReader:
                 f"Unexpected error reading file: {self.file_path}", details=str(e), original_exception=e
             ) from e
 
-    def read(self) -> list[str]:
-        """Read the entire file and return a list of normalized lines.
+    def read(self) -> str:
+        """Read the entire file and return the normalized file content as a string.
 
-        .. deprecated::
-            Use :meth:`readlines` instead. This method will be repurposed in version 2025.1.0
-            to return the raw file content as a string.
-
-        The returned lines have newline sequences normalized to ``\n``.
+        The returned string has newline sequences normalized to ``\n``.
 
         Returns:
-            list[str]: Normalized lines from the file.
+            str: Normalized file content.
 
         Raises:
             SplurgeSafeIoFileDecodingError: If decoding fails.
@@ -244,14 +239,11 @@ class SafeTextFileReader:
             SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
             SplurgeSafeIoOsError: For unexpected OS-level errors.
             SplurgeSafeIoUnknownError: For other unexpected errors.
+
+        Note: This method is equivalent to calling `readlines()` and joining the lines with `\n`.
         """
-        warnings.warn(
-            "SafeTextFileReader.read() is deprecated and will be removed in version 2025.1.0. "
-            "Use SafeTextFileReader.readlines() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.readlines()
+
+        return f"{CANONICAL_NEWLINE}".join(self.readlines())
 
     def readlines(self) -> list[str]:
         """Read the entire file and return a list of normalized lines.
@@ -289,41 +281,6 @@ class SafeTextFileReader:
         if self.strip:
             return [ln.strip() for ln in lines]
         return list(lines)
-
-    def read_as_stream(self) -> Iterator[list[str]]:
-        """Yield chunks of normalized lines from the file.
-
-        .. deprecated::
-            Use :meth:`readlines_as_stream` instead. This method will be removed in version 2025.1.0.
-
-        The method decodes bytes incrementally using an incremental
-        decoder. For encodings that cannot be handled incrementally the
-        implementation falls back to a full read and yields chunked lists
-        from the already-decoded lines.
-
-        The streaming reader honors `skip_header_lines` and
-        `skip_footer_lines`. Footer skipping is implemented by buffering
-        the last N lines and only emitting lines once they can no longer
-        be part of the footer.
-
-        Yields:
-            Iterator[list[str]]: Lists of normalized lines. Each yielded
-            list has length <= ``chunk_size``.
-
-        Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
-        """
-        warnings.warn(
-            "SafeTextFileReader.read_as_stream() is deprecated and will be removed in version 2025.1.0. "
-            "Use SafeTextFileReader.readlines_as_stream() instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        yield from self.readlines_as_stream()
 
     def readlines_as_stream(self) -> Iterator[list[str]]:
         """Yield chunks of normalized lines from the file.

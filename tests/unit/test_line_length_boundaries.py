@@ -22,6 +22,6 @@ def test_line_length_and_buffer_boundaries(tmp_path: Path, line_len: int, newlin
     buffer_sizes = [MIN_BUFFER_SIZE, MIN_BUFFER_SIZE + 1, 2048, 4096, 8192]
     for buf in buffer_sizes:
         reader = SafeTextFileReader(f, buffer_size=buf, chunk_size=500, strip=False)
-        flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
+        flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
         read_all = reader.read()
-        assert flattened == read_all, f"Mismatch for line_len={line_len} newline={repr(newline)} buf={buf}"
+        assert flattened == read_all.splitlines(), f"Mismatch for line_len={line_len} newline={repr(newline)} buf={buf}"

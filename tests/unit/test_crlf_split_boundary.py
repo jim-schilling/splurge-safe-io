@@ -31,7 +31,7 @@ def test_crlf_split_boundary_roundtrip(tmp_path: Path):
     assert buf is not None, "Failed to find a buffer size that splits a CRLF across a boundary"
 
     reader = SafeTextFileReader(f, buffer_size=buf, chunk_size=100, strip=False)
-    flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
+    flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
     read_all = reader.read()
 
-    assert flattened == read_all
+    assert flattened == read_all.splitlines()

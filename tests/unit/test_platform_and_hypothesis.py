@@ -84,9 +84,9 @@ def test_hypothesis_chunked_stream_equals_full_read(s):
         tf.close()
         full = SafeTextFileReader(tf.name).read()
         streamed = []
-        for c in SafeTextFileReader(tf.name, chunk_size=1).read_as_stream():
+        for c in SafeTextFileReader(tf.name, chunk_size=1).readlines_as_stream():
             streamed.extend(c)
-        assert streamed == full
+        assert "\n".join(streamed) == full
     finally:
         try:
             os.unlink(tf.name)
@@ -111,9 +111,9 @@ def test_hypothesis_binary_encoding_roundtrip(data, enc):
             return
 
         streamed = []
-        for chunk in SafeTextFileReader(tf.name, chunk_size=1, encoding=enc).read_as_stream():
+        for chunk in SafeTextFileReader(tf.name, chunk_size=1, encoding=enc).readlines_as_stream():
             streamed.extend(chunk)
-        assert streamed == full
+        assert "\n".join(streamed) == full
     finally:
         try:
             os.unlink(tf.name)

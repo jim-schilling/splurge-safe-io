@@ -71,7 +71,7 @@ def test_reader_incremental_decoder_fallback(monkeypatch, tmp_path: Path):
 
     reader = SafeTextFileReader(fpath, encoding="utf-8")
     # The fallback yields chunks produced by read(); ensure it yields at least once
-    chunks = list(reader.read_as_stream())
+    chunks = list(reader.readlines_as_stream())
     assert any(isinstance(c, list) for c in chunks)
 
 
@@ -81,15 +81,15 @@ def test_reader_footer_header_finalization(tmp_path: Path):
     fpath.write_text("L1\nL2\nL3\n", encoding="utf-8")
 
     r = SafeTextFileReader(fpath, skip_header_lines=1, skip_footer_lines=5, chunk_size=2)
-    # All lines become part of footer or skipped, so read() should return []
-    assert r.read() == []
+    # All lines become part of footer or skipped, so read() should return ""
+    assert r.read() == ""
 
     # Test partial final carry (no trailing newline)
     fpath2 = tmp_path / "no_nl.txt"
     fpath2.write_text("one\npartial", encoding="utf-8")
     r2 = SafeTextFileReader(fpath2, strip=False, chunk_size=10)
     all_lines = []
-    for chunk in r2.read_as_stream():
+    for chunk in r2.readlines_as_stream():
         all_lines.extend(chunk)
     # Expect two lines: 'one' and 'partial'
     assert any("partial" in ln for ln in all_lines)

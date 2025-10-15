@@ -34,4 +34,8 @@ with open_safe_text_writer('out.txt') as buf:
     buf.write('\n'.join(['one','two','three']))
 ```
 
+
+> **⚠️ BREAKING CHANGE for v2025.1.0:** `SafeTextFileReader.read()` now returns a `str` containing the entire normalized file content instead of a `list[str]` of lines. Use `SafeTextFileReader.readlines()` to get a list of lines.
+
+
 See `docs/README-DETAILS.md` for a complete guide and usage examples.

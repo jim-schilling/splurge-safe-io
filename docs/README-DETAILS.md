@@ -1,6 +1,8 @@
 ````markdown
 # splurge-safe-io — Developer guide and extended examples
 
+> **⚠️ BREAKING CHANGE for v2025.1.0:** `SafeTextFileReader.read()` now returns a `str` containing the entire normalized file content instead of a `list[str]` of lines. Use `SafeTextFileReader.readlines()` to get a list of lines.
+
 This guide complements the project `README.md` and the API reference (`docs/api/API-REFERENCE.md`) with
 practical guidance, common workflows, and tips for integrating `splurge-safe-io` into applications.
 

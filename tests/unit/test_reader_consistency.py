@@ -18,7 +18,7 @@ def test_reader_consistency_roundtrip():
     """Writes NUM_LINES lines and asserts three read methods agree.
 
     - SafeTextFileReader.read()
-    - SafeTextFileReader.read_as_stream() flattened
+    - SafeTextFileReader.readlines_as_stream() flattened
     - open_safe_text_reader() result
     """
     write_test_file(TEST_FILE, NUM_LINES)
@@ -30,7 +30,7 @@ def test_reader_consistency_roundtrip():
 
         # Flatten streamed chunks into a single list
         actual1 = []
-        for chunk in reader.read_as_stream():
+        for chunk in reader.readlines_as_stream():
             actual1.extend(chunk)
 
         actual2 = []
@@ -38,6 +38,6 @@ def test_reader_consistency_roundtrip():
         with open_safe_text_reader(TEST_FILE) as sio:
             actual2 = list(sio.read().splitlines())
 
-        assert actual0 == actual1
-        assert actual0 == actual2
+        assert actual0.splitlines() == actual1
+        assert actual0 == "\n".join(actual2)
         assert actual1 == actual2

@@ -120,11 +120,10 @@ Arguments:
 - `buffer_size (int)`: Raw byte-read size used during streaming. Defaults to 32768 bytes.
 
 Methods:
+- `.read() -> str`: Read entire file and return normalized file content as a single string. Newline sequences are normalized to ``\n``. This is equivalent to calling `readlines()` and joining the result with ``\n``.
 - `.readlines() -> list[str]`: Read full file and return normalized lines (LF newlines). Raises mapping exceptions above.
 - `.readlines_as_stream() -> Iterator[list[str]]`: Stream lists of lines (chunked). Uses an incremental decoder and yields lists containing up to `chunk_size` lines. The reader reads raw bytes from disk using a `buffer_size` (default 32768 bytes) per raw read; `chunk_size` controls the maximum number of lines returned per yielded list. The implementation enforces a minimum buffer size (`MIN_BUFFER_SIZE = 16384`) — requests for a smaller `buffer_size` are rounded up to that minimum. If the incremental decoder raises `UnicodeError` (for example when decoding UTF-16 without a BOM), the implementation falls back to a full read and then yields chunked lists from the already-decoded lines.
 - `.preview(max_lines: int = 25) -> list[str]`: Return first N normalized lines. `preview()` uses the streaming reader internally and will stop reading as soon as `max_lines` lines are available for most encodings; for encodings that do not support incremental decoding the implementation falls back to a full read.
-- `.read() -> list[str]`: **Deprecated**. Use `readlines()` instead. This method will be repurposed in version 2025.1.0 to return raw file content as a string.
-- `.read_as_stream() -> Iterator[list[str]]`: **Deprecated**. Use `readlines_as_stream()` instead. This method will be removed in version 2025.1.0.
 
 - `.line_count(threshold_bytes: int = 64 * 1024 * 1024) -> int`: Count the number of logical lines in the file in a memory-efficient way.
 
@@ -156,8 +155,14 @@ Example:
 ```py
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 
+# Read entire file as a single string
 r = SafeTextFileReader('data.txt', encoding='utf-8')
-lines = r.readlines()
+content = r.read()  # Returns: "line1\nline2\nline3"
+
+# Read as a list of lines
+lines = r.readlines()  # Returns: ["line1", "line2", "line3"]
+
+# Stream lines in chunks
 for chunk in r.readlines_as_stream():
     for ln in chunk:
         print(ln)

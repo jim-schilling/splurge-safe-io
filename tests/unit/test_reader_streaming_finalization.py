@@ -44,7 +44,7 @@ def test_final_parts_and_carry_emission(monkeypatch, tmp_path):
         p, encoding="utf-8", strip=False, skip_header_lines=0, skip_footer_lines=0, chunk_size=10
     )
     out = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         out.extend(chunk)
 
     # Expected lines: 'a' and 'partial' and 'end'
@@ -64,7 +64,7 @@ def test_footer_buffering_with_final_carry(monkeypatch, tmp_path):
         p, encoding="utf-8", strip=True, skip_header_lines=0, skip_footer_lines=2, chunk_size=10
     )
     out = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         out.extend(chunk)
 
     # There are 3 logical lines: '1', '2', and '3part' but footer=2 => only '1' emitted
