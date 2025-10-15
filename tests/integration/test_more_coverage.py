@@ -73,14 +73,14 @@ def test_read_skip_footer_and_stream_and_open_reader(tmp_path):
     p.write_text("a\nb\nc\n")
     # skip_footer_lines greater than file lines should return []
     rdr = SafeTextFileReader(p, skip_footer_lines=10)
-    assert rdr.read() == []
+    assert rdr.read() == ""
 
     # streaming (chunk_size 1) should yield same content as read when no footer
     rdr2 = SafeTextFileReader(p, chunk_size=1)
     streamed = []
-    for chunk in rdr2.read_as_stream():
+    for chunk in rdr2.readlines_as_stream():
         streamed.extend(chunk)
-    assert streamed == rdr2.read()
+    assert streamed == rdr2.readlines()
 
     # open_safe_text_reader context manager produces a StringIO with content
     with open_safe_text_reader(p) as sio:
@@ -113,7 +113,7 @@ def test_reader_stream_footer_header_and_final_carry(tmp_path):
     p = tmp_path / "carry.txt"
     p.write_text("1\n2\n3")
     rdr = SafeTextFileReader(p, chunk_size=2, skip_header_lines=1, skip_footer_lines=1)
-    chunks = list(rdr.read_as_stream())
+    chunks = list(rdr.readlines_as_stream())
     # skip header (1) and footer (1) -> only middle '2' remains
     flat = [x for chunk in chunks for x in chunk]
     assert flat == ["2"]
@@ -226,7 +226,7 @@ def test_reader_stream_footer_and_byte_boundary(tmp_path):
     p.write_text("\n".join(str(i) for i in range(6)) + "\n")
     # Streaming with chunk_size should yield lists of length <= chunk_size
     rdr = SafeTextFileReader(p, chunk_size=2, skip_footer_lines=1)
-    chunks = list(rdr.read_as_stream())
+    chunks = list(rdr.readlines_as_stream())
     # Ensure chunks are lists and contain only strings from the source file
     assert all(isinstance(ch, list) for ch in chunks)
     flat = [x for ch in chunks for x in ch]
@@ -240,7 +240,7 @@ def test_reader_stream_footer_and_byte_boundary(tmp_path):
     p2.write_bytes("€\n€\n€\n".encode())
     rdr2 = SafeTextFileReader(p2, encoding="utf-8", chunk_size=2)
     # should not raise and should return 3 lines
-    out_chunks = list(rdr2.read_as_stream())
+    out_chunks = list(rdr2.readlines_as_stream())
     out = [x for chunk in out_chunks for x in chunk]
     assert len(out) == 3
     assert all(isinstance(s, str) for s in out)
@@ -257,9 +257,9 @@ def test_reader_newline_variants_and_long_line(tmp_path):
     p.write_bytes(content.encode("utf-8"))
 
     rdr = SafeTextFileReader(p, chunk_size=16, strip=False)
-    flat = [x for ch in rdr.read_as_stream() for x in ch]
-    # compare to full read() semantics
-    full = rdr.read()
+    flat = [x for ch in rdr.readlines_as_stream() for x in ch]
+    # compare to full readlines() semantics
+    full = rdr.readlines()
     assert flat == full
 
 
@@ -279,6 +279,6 @@ def test_read_as_stream_fallback_decoder(monkeypatch, tmp_path):
 
     monkeypatch.setattr(codecs, "getincrementaldecoder", lambda enc: (lambda: BadDecoder()))
     rdr = SafeTextFileReader(p, chunk_size=1)
-    # Should not raise and should yield same lines as read()
-    streamed = [x for ch in rdr.read_as_stream() for x in ch]
-    assert streamed == rdr.read()
+    # Should not raise and should yield same lines as readlines()
+    streamed = [x for ch in rdr.readlines_as_stream() for x in ch]
+    assert streamed == rdr.readlines()

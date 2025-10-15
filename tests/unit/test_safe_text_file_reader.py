@@ -15,12 +15,200 @@ def create_mixed_file(tmp_path, filename="mixed.txt"):
     return p
 
 
-def test_read_full_and_strip(tmp_path):
+def test_read_returns_string_with_normalized_content(tmp_path):
+    p = create_mixed_file(tmp_path)
+    r = SafeTextFileReader(p)
+    content = r.read()
+    assert isinstance(content, str)
+    # Should have normalized newlines (\n only)
+    assert "\r\n" not in content
+    assert "\r" not in content
+    # Should contain the expected content
+    assert "line1\nline2\nline3\nline4 ü\nline5" == content
+
+
+def test_read_equivalent_to_readlines_joined(tmp_path):
+    p = create_mixed_file(tmp_path)
+    r = SafeTextFileReader(p)
+    content = r.read()
+    lines = r.readlines()
+    expected = "\n".join(lines)
+    assert content == expected
+
+
+def test_read_with_strip(tmp_path):
     p = create_mixed_file(tmp_path)
     r = SafeTextFileReader(p, strip=True)
-    lines = r.read()
-    assert lines[0] == "line1"
-    assert any("ü" in ln for ln in lines)
+    content = r.read()
+    lines = r.readlines()
+    expected = "\n".join(lines)
+    assert content == expected
+    # Verify strip worked - no leading/trailing whitespace
+    assert content.startswith("line1")
+    assert "ü" in content
+
+
+def test_read_with_skip_header_lines(tmp_path):
+    p = create_mixed_file(tmp_path)
+    r = SafeTextFileReader(p, skip_header_lines=2)
+    content = r.read()
+    lines = r.readlines()
+    expected = "\n".join(lines)
+    assert content == expected
+    # Should skip first 2 lines
+    assert content.startswith("line3")
+    assert "line1" not in content
+    assert "line2" not in content
+
+
+def test_read_with_skip_footer_lines(tmp_path):
+    p = create_mixed_file(tmp_path)
+    r = SafeTextFileReader(p, skip_footer_lines=1)
+    content = r.read()
+    lines = r.readlines()
+    expected = "\n".join(lines)
+    assert content == expected
+    # Should skip last line
+    assert "line5" not in content
+    assert content.endswith("line4 ü")
+
+
+def test_read_with_skip_empty_lines(tmp_path):
+    p = tmp_path / "file_with_empty.txt"
+    content_with_empty = "line1\n\nline2\n  \nline3\n"
+    p.write_bytes(content_with_empty.encode("utf-8"))
+    r = SafeTextFileReader(p, skip_empty_lines=True)
+    content = r.read()
+    lines = r.readlines()
+    expected = "\n".join(lines)
+    assert content == expected
+    # Should only contain non-empty lines
+    assert "line1\nline2\nline3" == content
+
+
+def test_read_empty_file(tmp_path):
+    p = tmp_path / "empty.txt"
+    p.write_text("")
+    r = SafeTextFileReader(p)
+    content = r.read()
+    assert content == ""
+    assert isinstance(content, str)
+
+
+def test_streaming_footer_buffer_with_empty_line_filtering(tmp_path):
+    """Test footer buffer logic (lines 418-423) with empty line filtering and stripping."""
+    p = tmp_path / "footer_test.txt"
+    # Create content where the footer buffer will fill up and emit lines
+    # We want skip_footer_lines=2, so lines 8-9 should be skipped
+    # Include empty lines and whitespace-only lines to test filtering
+    lines = [
+        "line0",  # 0 - will be emitted
+        "",  # 1 - empty, will be filtered if skip_empty_lines=True
+        "line2",  # 2 - will be emitted
+        "   ",  # 3 - whitespace only, will be filtered if skip_empty_lines=True
+        "line4",  # 4 - will be emitted
+        "line5",  # 5 - will be emitted
+        "line6",  # 6 - will be emitted
+        "line7",  # 7 - will be emitted (buffer full, this gets emitted)
+        "footer1",  # 8 - footer, skipped
+        "footer2",  # 9 - footer, skipped
+    ]
+    p.write_text("\n".join(lines))
+
+    # Test with skip_empty_lines=True and strip=True
+    r = SafeTextFileReader(p, chunk_size=2, skip_footer_lines=2, skip_empty_lines=True, strip=True)
+    out = []
+    for chunk in r.readlines_as_stream():
+        out.extend(chunk)
+
+    # Expected: ["line0", "line2", "line4", "line5", "line6", "line7"]
+    # - line1 ("") and line3 ("   ") are filtered out due to skip_empty_lines=True
+    # - line8 ("footer1") and line9 ("footer2") are skipped due to skip_footer_lines=2
+    # - All remaining lines are stripped
+    expected = ["line0", "line2", "line4", "line5", "line6", "line7"]
+    assert out == expected
+
+
+def test_all_filtering_options_combined(tmp_path):
+    """Test edge case: all filtering options enabled simultaneously."""
+    p = tmp_path / "complex_filtering.txt"
+    # Create a file with various types of content that will be filtered
+    lines = [
+        "  header1  ",  # 0 - header, will be skipped
+        "  header2  ",  # 1 - header, will be skipped
+        "",  # 2 - empty, will be filtered
+        "   ",  # 3 - whitespace only, will be filtered
+        "  content1  ",  # 4 - content, will be stripped to "content1"
+        "  content2  ",  # 5 - content, will be stripped to "content2"
+        "",  # 6 - empty, will be filtered
+        "  footer1  ",  # 7 - footer, will be skipped
+        "  footer2  ",  # 8 - footer, will be skipped
+    ]
+    p.write_text("\n".join(lines))
+
+    # Test read() with all options
+    r = SafeTextFileReader(p, skip_header_lines=2, skip_footer_lines=2, skip_empty_lines=True, strip=True)
+    result = r.read()
+    expected = "content1\ncontent2"
+    assert result == expected
+
+    # Test readlines() with all options
+    lines_result = r.readlines()
+    assert lines_result == ["content1", "content2"]
+
+    # Test readlines_as_stream() with all options
+    stream_result = []
+    for chunk in r.readlines_as_stream():
+        stream_result.extend(chunk)
+    assert stream_result == ["content1", "content2"]
+
+
+def test_single_line_file_edge_cases(tmp_path):
+    """Test edge cases with single-line files."""
+    # Test single line with trailing newline
+    p1 = tmp_path / "single_with_nl.txt"
+    p1.write_text("single line\n")
+    r1 = SafeTextFileReader(p1)
+    assert r1.read() == "single line"
+    assert r1.readlines() == ["single line"]
+    assert list(r1.readlines_as_stream()) == [["single line"]]
+
+    # Test single line without trailing newline
+    p2 = tmp_path / "single_no_nl.txt"
+    p2.write_text("single line")
+    r2 = SafeTextFileReader(p2)
+    assert r2.read() == "single line"
+    assert r2.readlines() == ["single line"]
+    assert list(r2.readlines_as_stream()) == [["single line"]]
+
+    # Test single empty line
+    p3 = tmp_path / "single_empty.txt"
+    p3.write_text("")
+    r3 = SafeTextFileReader(p3)
+    assert r3.read() == ""
+    assert r3.readlines() == []
+    assert list(r3.readlines_as_stream()) == []
+
+
+def test_extreme_parameter_values(tmp_path):
+    """Test edge cases with extreme parameter values."""
+    p = tmp_path / "extreme.txt"
+    lines = [f"line{i}" for i in range(10)]
+    p.write_text("\n".join(lines))
+
+    # Test with very large skip values (should be clamped)
+    r = SafeTextFileReader(p, skip_header_lines=100, skip_footer_lines=100)
+    assert r.read() == ""  # All lines should be skipped
+    assert r.readlines() == []
+
+    # Test with chunk_size = MIN_CHUNK_SIZE
+    from splurge_safe_io.constants import MIN_CHUNK_SIZE
+
+    r2 = SafeTextFileReader(p, chunk_size=MIN_CHUNK_SIZE)
+    chunks = list(r2.readlines_as_stream())
+    # Should still work correctly
+    flattened = [line for chunk in chunks for line in chunk]
+    assert flattened == lines
 
 
 def test_preview_limits(tmp_path):
@@ -37,7 +225,7 @@ def test_streaming_with_chunks_and_footer(tmp_path):
 
     r = SafeTextFileReader(p, chunk_size=3, skip_footer_lines=2)
     out = []
-    for chunk in r.read_as_stream():
+    for chunk in r.readlines_as_stream():
         out.extend(chunk)
     assert len(out) == 8
     assert out[-1] == "l7"
@@ -48,7 +236,7 @@ def test_streaming_header_skip(tmp_path):
     p.write_text("h1\nh2\nbody1\nbody2")
     r = SafeTextFileReader(p, skip_header_lines=2)
     all_lines = []
-    for c in r.read_as_stream():
+    for c in r.readlines_as_stream():
         all_lines.extend(c)
     assert all_lines == ["body1", "body2"]
 
@@ -296,7 +484,7 @@ def test_line_count_rejects_small_threshold(tmp_path):
 
 def test_streaming_large_file_skip_empty_lines_behavior(tmp_path, monkeypatch):
     """Create a temporary file >1MiB, force streaming, and validate behavior
-    of read_as_stream(), line_count(), and preview() with skip_empty_lines
+    of readlines_as_stream(), line_count(), and preview() with skip_empty_lines
     True and False.
     """
     p = tmp_path / "large_mixed.txt"
@@ -335,7 +523,7 @@ def test_streaming_large_file_skip_empty_lines_behavior(tmp_path, monkeypatch):
     # First: skip_empty_lines = True
     r_true = SafeTextFileReader(p, skip_empty_lines=True)
     collected_true: list[str] = []
-    for chunk in r_true.read_as_stream():
+    for chunk in r_true.readlines_as_stream():
         collected_true.extend(chunk)
 
     # Build expected sequences using the same normalization the reader uses
@@ -357,7 +545,7 @@ def test_streaming_large_file_skip_empty_lines_behavior(tmp_path, monkeypatch):
     # Second: skip_empty_lines = False (default)
     r_false = SafeTextFileReader(p, skip_empty_lines=False)
     collected_false: list[str] = []
-    for chunk in r_false.read_as_stream():
+    for chunk in r_false.readlines_as_stream():
         collected_false.extend(chunk)
 
     # Exact match: streamed output should equal the original logical lines
@@ -424,7 +612,7 @@ def test_streaming_large_file_skip_empty_lines_behavior_utf16(tmp_path, monkeypa
     # First: skip_empty_lines = True
     r_true = SafeTextFileReader(p, skip_empty_lines=True, encoding="utf-16-le")
     collected_true: list[str] = []
-    for chunk in r_true.read_as_stream():
+    for chunk in r_true.readlines_as_stream():
         collected_true.extend(chunk)
 
     normalized = content.replace("\r\n", "\n").replace("\r", "\n")
@@ -442,7 +630,7 @@ def test_streaming_large_file_skip_empty_lines_behavior_utf16(tmp_path, monkeypa
     # Second: skip_empty_lines = False
     r_false = SafeTextFileReader(p, skip_empty_lines=False, encoding="utf-16-le")
     collected_false: list[str] = []
-    for chunk in r_false.read_as_stream():
+    for chunk in r_false.readlines_as_stream():
         collected_false.extend(chunk)
 
     assert collected_false == expected_all

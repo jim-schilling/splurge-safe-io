@@ -39,10 +39,10 @@ def test_newline_variants_split_roundtrip(tmp_path: Path, nl: str):
         pytest.skip(f"Couldn't find a buffer size in range that splits newline {repr(nl)} across a boundary")
 
     reader = SafeTextFileReader(f, buffer_size=buf, chunk_size=100, strip=False)
-    flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
+    flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
     read_all = reader.read()
 
-    assert flattened == read_all
+    assert flattened == read_all.splitlines()
 
 
 def test_utf16le_no_bom_fallback_roundtrip(tmp_path: Path):
@@ -57,7 +57,7 @@ def test_utf16le_no_bom_fallback_roundtrip(tmp_path: Path):
 
     # Request 'utf-16' to exercise potential incremental decoder issues
     reader = SafeTextFileReader(f, encoding="utf-16", buffer_size=4096, chunk_size=100, strip=False)
-    flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
-    read_all = reader.read()
+    flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
+    readlines_result = reader.readlines()
 
-    assert flattened == read_all
+    assert flattened == readlines_result

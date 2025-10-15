@@ -22,9 +22,9 @@ def test_flattened_stream_equals_read(tmp_path):
 
     reader = SafeTextFileReader(target, buffer_size=MIN_BUFFER_SIZE, chunk_size=500, strip=True)
 
-    flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
+    flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
     read_all = reader.read()
 
     # The correct behavior is equality between the flattened streamed output
     # and the full read(). This assertion verifies the bug is fixed.
-    assert flattened == read_all
+    assert flattened == read_all.splitlines()

@@ -26,7 +26,7 @@ def test_fuzz_stream_vs_read(buf: int, num_lines: int, max_line_len: int):
             fh.write(f"{i},{ln}\r\n".encode())
 
     reader = SafeTextFileReader(f, buffer_size=buf, chunk_size=500, strip=False)
-    flattened = [ln for chunk in reader.read_as_stream() for ln in chunk]
+    flattened = [ln for chunk in reader.readlines_as_stream() for ln in chunk]
     read_all = reader.read()
-    assert flattened == read_all
+    assert flattened == read_all.splitlines()
     td.cleanup()

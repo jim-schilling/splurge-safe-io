@@ -20,7 +20,7 @@ def test_streaming_footer_and_carry(tmp_path):
 
     reader = SafeTextFileReader(p, encoding="utf-8", strip=False, skip_footer_lines=2, chunk_size=10)
     emitted = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         for ln in chunk:
             emitted.append(ln)
     # The reader should skip the final footer lines. At minimum the
@@ -41,7 +41,7 @@ def test_streaming_header_and_final_carry(tmp_path):
         p, encoding="utf-8", strip=True, skip_header_lines=2, skip_footer_lines=1, chunk_size=50
     )
     all_lines = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         all_lines.extend(chunk)
     # After skipping 2 headers and 1 footer, left with body1 and body2
     assert all_lines == ["body1", "body2"]
@@ -60,7 +60,7 @@ def test_incremental_decoder_fallback_utf16_no_bom(tmp_path):
         p, encoding="utf-16", strip=False, skip_header_lines=0, skip_footer_lines=0, chunk_size=2
     )
     emitted = []
-    for chunk in reader.read_as_stream():
+    for chunk in reader.readlines_as_stream():
         for ln in chunk:
             emitted.append(ln)
     assert emitted == lines

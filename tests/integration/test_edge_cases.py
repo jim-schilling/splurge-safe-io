@@ -91,11 +91,11 @@ def test_reader_chunk_boundary_multibyte(tmp_path):
     # chunk_size=1 forces the reader to process one byte at a time
     r = SafeTextFileReader(p, chunk_size=1)
     stream_lines = []
-    for chunk in r.read_as_stream():
+    for chunk in r.readlines_as_stream():
         stream_lines.extend(chunk)
 
     full_lines = SafeTextFileReader(p).read()
-    assert stream_lines == full_lines
+    assert stream_lines == full_lines.splitlines()
 
 
 def test_reader_skip_footer_larger_than_file(tmp_path):
@@ -103,19 +103,19 @@ def test_reader_skip_footer_larger_than_file(tmp_path):
     p.write_text("onlyline")
     r = SafeTextFileReader(p, skip_footer_lines=10)
     out = []
-    for c in r.read_as_stream():
+    for c in r.readlines_as_stream():
         out.extend(c)
     assert out == []
-    assert SafeTextFileReader(p, skip_footer_lines=10).read() == []
+    assert SafeTextFileReader(p, skip_footer_lines=10).read() == ""
 
 
 def test_reader_empty_file(tmp_path):
     p = tmp_path / "empty.txt"
     p.write_text("")
     r = SafeTextFileReader(p)
-    assert r.read() == []
+    assert r.read() == ""
     out = []
-    for c in r.read_as_stream():
+    for c in r.readlines_as_stream():
         out.extend(c)
     assert out == []
 
