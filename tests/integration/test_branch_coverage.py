@@ -21,7 +21,7 @@ pytestmark = [pytest.mark.integration]
 
 def test_validate_relative_disallowed():
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("rel/path.txt", allow_relative=False)
+        PathValidator.get_validated_path("rel/path.txt", allow_relative=False)
 
 
 def test_validate_base_directory_traversal(tmp_path):
@@ -30,7 +30,7 @@ def test_validate_base_directory_traversal(tmp_path):
     outside = tmp_path / "outside.txt"
     outside.write_text("x")
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(outside, base_directory=base)
+        PathValidator.get_validated_path(outside, base_directory=base)
 
 
 @pytest.mark.serial
@@ -43,18 +43,18 @@ def test_validate_resolve_oserror(monkeypatch, tmp_path):
 
     monkeypatch.setattr(Path, "resolve", raise_os)
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(p)
+        PathValidator.get_validated_path(p)
 
 
 def test_validate_must_exist_and_must_be_file(tmp_path):
     nonexist = tmp_path / "nope.txt"
     with pytest.raises(SplurgeSafeIoFileNotFoundError):
-        PathValidator.validate_path(nonexist, must_exist=True)
+        PathValidator.get_validated_path(nonexist, must_exist=True)
 
     d = tmp_path / "adir"
     d.mkdir()
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(d, must_be_file=True)
+        PathValidator.get_validated_path(d, must_be_file=True)
 
 
 def test_validate_readable_writable_access(monkeypatch, tmp_path):
@@ -74,9 +74,9 @@ def test_validate_readable_writable_access(monkeypatch, tmp_path):
 
     monkeypatch.setattr(os, "access", access_stub)
     with pytest.raises(SplurgeSafeIoFilePermissionError):
-        PathValidator.validate_path(f, must_be_readable=True)
+        PathValidator.get_validated_path(f, must_be_readable=True)
     with pytest.raises(SplurgeSafeIoFilePermissionError):
-        PathValidator.validate_path(f, must_be_writable=True)
+        PathValidator.get_validated_path(f, must_be_writable=True)
 
 
 @pytest.mark.parametrize(

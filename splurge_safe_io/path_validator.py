@@ -130,6 +130,46 @@ class PathValidator:
             SplurgeSafeIoFileNotFoundError: If must_exist is True and file is missing.
             SplurgeSafeIoFilePermissionError: If must_be_readable is True and the file is not readable.
         """
+        # Deprecated wrapper: prefer `get_validated_path` which returns a
+        # validated and resolved pathlib.Path. ``validate_path`` will be
+        # removed in release 2025.2.0.
+        import warnings
+
+        warnings.warn(
+            "PathValidator.validate_path is deprecated; use PathValidator.get_validated_path(...) instead. "
+            "Scheduled removal: 2025.2.0",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        return cls.get_validated_path(
+            file_path,
+            must_exist=must_exist,
+            must_be_file=must_be_file,
+            must_be_readable=must_be_readable,
+            must_be_writable=must_be_writable,
+            allow_relative=allow_relative,
+            base_directory=base_directory,
+        )
+
+    @classmethod
+    def get_validated_path(
+        cls,
+        file_path: str | Path,
+        *,
+        must_exist: bool = False,
+        must_be_file: bool = False,
+        must_be_readable: bool = False,
+        must_be_writable: bool = False,
+        allow_relative: bool = True,
+        base_directory: str | Path | None = None,
+    ) -> Path:
+        """Validate and return a resolved pathlib.Path.
+
+        This is the primary implementation: it performs the same checks
+        that previously lived in ``validate_path`` but is named to make
+        it obvious the function returns a validated Path object.
+        """
         # Convert to Path object
         path = Path(file_path) if isinstance(file_path, str) else file_path
 

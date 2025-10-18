@@ -17,7 +17,7 @@ def test_windows_drive_patterns():
     patterns = ["C:", "C:\\", "C:\\path\\to\\file.txt", "D:/path/file.txt"]
     for p in patterns:
         try:
-            PathValidator.validate_path(p, allow_relative=True)
+            PathValidator.get_validated_path(p, allow_relative=True)
         except SplurgeSafeIoPathValidationError:
             # On some platforms or environments this may raise; ensure
             # the exception is a PathValidationError rather than a crash.
@@ -29,7 +29,7 @@ def test_unc_path_like_strings():
     # are handled as strings by the validator and don't crash.
     unc = "\\\\server\\share\\folder\\file.txt"
     try:
-        PathValidator.validate_path(unc)
+        PathValidator.get_validated_path(unc)
     except SplurgeSafeIoPathValidationError:
         assert True
 
@@ -44,7 +44,7 @@ def test_symlink_behavior(tmp_path):
         pytest.skip("Symlinks not supported in this environment")
 
     # Validating the symlink should resolve and succeed when must_exist=True
-    resolved = PathValidator.validate_path(link, must_exist=True)
+    resolved = PathValidator.get_validated_path(link, must_exist=True)
     assert resolved.exists()
 
 
@@ -127,7 +127,7 @@ def test_windows_unc_and_posix_specifics():
     # should still be handled gracefully.
     unc = "\\\\server\\share\\file.txt"
     try:
-        PathValidator.validate_path(unc)
+        PathValidator.get_validated_path(unc)
     except SplurgeSafeIoPathValidationError:
         # allowed to raise validation error, but must not crash
         assert True
@@ -137,6 +137,6 @@ def test_windows_unc_and_posix_specifics():
     # if they look like drive paths.
     posix_abs = "/usr/bin/env"
     try:
-        PathValidator.validate_path(posix_abs)
+        PathValidator.get_validated_path(posix_abs)
     except SplurgeSafeIoPathValidationError:
         assert True

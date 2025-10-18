@@ -29,7 +29,7 @@ def test_pre_resolution_policy_registration_and_clear():
 
     PathValidator.register_pre_resolution_policy(reject_forbidden)
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("/tmp/this_is_forbidden.txt")
+        PathValidator.get_validated_path("/tmp/this_is_forbidden.txt")
 
     # Ensure the policy is visible and then clear it
     policies = PathValidator.list_pre_resolution_policies()
@@ -91,16 +91,16 @@ def test_read_skip_footer_and_stream_and_open_reader(tmp_path):
 def test_path_validator_dangerous_and_length_and_is_safe(tmp_path):
     # Dangerous character '<' should raise
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("bad<name")
+        PathValidator.get_validated_path("bad<name")
 
     # Colon in invalid position
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("weird:path")
+        PathValidator.get_validated_path("weird:path")
 
     # Excessive length
     long_path = "a" * (PathValidator.MAX_PATH_LENGTH + 1)
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(long_path)
+        PathValidator.get_validated_path(long_path)
 
     # is_safe_path True for normal path
     p = tmp_path / "ok.txt"
