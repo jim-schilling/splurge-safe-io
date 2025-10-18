@@ -33,27 +33,27 @@ def test_validate_path_resolve_failure(monkeypatch, tmp_path: Path):
     # Patch Path.resolve to simulate a resolve-time error (monkeypatch will restore)
     monkeypatch.setattr(pathlib.Path, "resolve", _bad_resolve)
     with pytest.raises(SplurgeSafeIoPathValidationError) as excinfo:
-        PathValidator.validate_path(tmp_path / "x", must_exist=False)
+        PathValidator.get_validated_path(tmp_path / "x", must_exist=False)
     assert isinstance(excinfo.value.original_exception, OSError)
 
 
 def test_validate_dangerous_character_and_length():
     # Dangerous character
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("bad|name")
+        PathValidator.get_validated_path("bad|name")
 
     # Control character
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("bad\x01name")
+        PathValidator.get_validated_path("bad\x01name")
 
     # Colon in wrong place
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path("notadrive:foo")
+        PathValidator.get_validated_path("notadrive:foo")
 
     # Too long
     long_path = "a" * (PathValidator.MAX_PATH_LENGTH + 1)
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(long_path)
+        PathValidator.get_validated_path(long_path)
 
 
 def test_reader_incremental_decoder_fallback(monkeypatch, tmp_path: Path):
@@ -158,7 +158,7 @@ def test_original_exception_propagation(tmp_path: Path, monkeypatch, permit_only
 
     monkeypatch.setattr(pathlib.Path, "resolve", _bad_resolve)
     with pytest.raises(SplurgeSafeIoPathValidationError) as ei:
-        PathValidator.validate_path(tmp_path / "x")
+        PathValidator.get_validated_path(tmp_path / "x")
     assert isinstance(ei.value.original_exception, OSError)
 
     # Restore resolve so subsequent operations are normal

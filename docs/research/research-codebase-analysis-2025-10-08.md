@@ -39,8 +39,8 @@ I list issues grouped by severity and then provide concrete suggestions.
 
 Recommendation: Rely primarily on Path.resolve()/relative_to checks for canonical containment when a `base_directory` is provided. Keep lightweight string sanity checks (NULs and control chars) but avoid rejecting `..` or repeated separators before path resolution. Add unit tests covering common Windows paths, UNC paths, and intentionally odd-but-valid names.
 
-### 3) PathValidator.validate_path API assumptions (low)
-- `validate_path` accepts `allow_relative` but if False it only checks `path.is_absolute()` on the Path object created from the input. Because resolution is performed later against `base_directory`, this is OK, but the semantics could be clarified: should relative paths be allowed when `base_directory` is provided? Currently yes (they are resolved relative to base_directory). Document this clearly.
+### 3) PathValidator.get_validated_path API assumptions (low)
+- `get_validated_path` (previously `validate_path`) accepts `allow_relative` but if False it only checks `path.is_absolute()` on the Path object created from the input. Because resolution is performed later against `base_directory`, this is OK, but the semantics could be clarified: should relative paths be allowed when `base_directory` is provided? Currently yes (they are resolved relative to base_directory). Document this clearly.
 
 Recommendation: Clarify `allow_relative` vs `base_directory` semantics in the docstring, and consider renaming to `allow_relative_input` if you want to be strict about the input type.
 

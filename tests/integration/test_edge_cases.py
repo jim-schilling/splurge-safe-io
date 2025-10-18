@@ -19,7 +19,7 @@ def test_allow_relative_false_raises(tmp_path):
     # Create a relative path string and ensure allow_relative=False rejects it
     rel = "somefile.txt"
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(rel, allow_relative=False)
+        PathValidator.get_validated_path(rel, allow_relative=False)
 
 
 def test_must_be_readable_permission_error(mocker, tmp_path):
@@ -41,7 +41,7 @@ def test_must_be_readable_permission_error(mocker, tmp_path):
     monkeypatch.setattr(__import__("os"), "access", access_stub)
     try:
         with pytest.raises(SplurgeSafeIoFilePermissionError):
-            PathValidator.validate_path(f, must_be_readable=True)
+            PathValidator.get_validated_path(f, must_be_readable=True)
     finally:
         monkeypatch.undo()
 
@@ -50,7 +50,7 @@ def test_long_path_rejected():
     # Construct an overly long path string
     long_path = "a" * (PathValidator.MAX_PATH_LENGTH + 10)
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(long_path)
+        PathValidator.get_validated_path(long_path)
 
 
 @pytest.mark.serial
@@ -71,7 +71,7 @@ def test_path_resolve_outside_base_with_mock(mocker, tmp_path):
     mocker.patch.object(pathlib.Path, "resolve", fake_resolve)
 
     with pytest.raises(SplurgeSafeIoPathValidationError):
-        PathValidator.validate_path(p, base_directory=base)
+        PathValidator.get_validated_path(p, base_directory=base)
 
 
 def test_reader_unicode_decode_error(tmp_path):

@@ -34,7 +34,8 @@ def demo_path_validation(tmp_dir: Path) -> None:
 
     # Validate a path before using it. This will resolve and normalize.
     try:
-        resolved = PathValidator.validate_path(p, must_exist=False)
+        # Use the new API name; `validate_path` is deprecated and will warn.
+        resolved = PathValidator.get_validated_path(p, must_exist=False)
         print("Resolved:", resolved)
     except SplurgeSafeIoError as exc:
         print("Path validation failed:", exc)

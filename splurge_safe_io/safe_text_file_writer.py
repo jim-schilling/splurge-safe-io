@@ -79,17 +79,22 @@ class SafeTextFileWriter:
         file_write_mode: TextFileWriteMode = TextFileWriteMode.CREATE_OR_TRUNCATE,
         encoding: str = DEFAULT_ENCODING,
         canonical_newline: str = CANONICAL_NEWLINE,
+        create_parents: bool = False,
     ) -> None:
-        self._file_path = PathValidator.validate_path(
+        self._file_path = PathValidator.get_validated_path(
             file_path, must_exist=False, must_be_file=False, must_be_writable=False
         )
         self._encoding = encoding or DEFAULT_ENCODING
         self._file_write_mode = file_write_mode or TextFileWriteMode.CREATE_OR_TRUNCATE
         self._canonical_newline = canonical_newline or CANONICAL_NEWLINE
+        # If True, create missing parent directories before opening the file
+        self._create_parents = bool(create_parents)
         # internal file object and thread-safe open flag
         self._file_obj: io.TextIOBase | None = None
         self._lock = threading.RLock()
-        # open the file during initialization
+        # create parents if requested, then open the file during initialization
+        if self._create_parents:
+            self._create_parents_impl()
         fp = self._open()
         with self._lock:
             self._file_obj = fp
@@ -146,6 +151,42 @@ class SafeTextFileWriter:
         except Exception as exc:
             raise SplurgeSafeIoUnknownError(
                 f"Unexpected error opening file: {self._file_path}", details=str(exc), original_exception=exc
+            ) from exc  # pragma: no cover
+
+    def _create_parents_impl(self) -> None:
+        """Create parent directories for the target file path.
+
+        This helper centralizes directory creation and maps filesystem
+        errors to the package's exception hierarchy.
+
+        Raises:
+            SplurgeSafeIoFilePermissionError: If directory creation is denied.
+            SplurgeSafeIoOsError: For other OS-level errors during creation.
+            SplurgeSafeIoUnknownError: For unexpected errors.
+        """
+        try:
+            parent_dir = self._file_path.parent
+            # Use pathlib's mkdir to create parents in a tidy way.
+            # If parent_dir is the current directory or already exists,
+            # this is effectively a no-op.
+            parent_dir.mkdir(parents=True, exist_ok=True)
+        except PermissionError as exc:
+            raise SplurgeSafeIoFilePermissionError(
+                f"Permission error creating parent directories for: {self._file_path}",
+                details=str(exc),
+                original_exception=exc,
+            ) from exc
+        except OSError as exc:
+            raise SplurgeSafeIoOsError(
+                f"OS error creating parent directories for: {self._file_path}",
+                details=str(exc),
+                original_exception=exc,
+            ) from exc
+        except Exception as exc:
+            raise SplurgeSafeIoUnknownError(
+                f"Unexpected error creating parent directories for: {self._file_path}",
+                details=str(exc),
+                original_exception=exc,
             ) from exc  # pragma: no cover
 
     def write(self, text: str) -> int:
@@ -279,6 +320,7 @@ def open_safe_text_writer(
     encoding: str = DEFAULT_ENCODING,
     file_write_mode: TextFileWriteMode = TextFileWriteMode.CREATE_OR_TRUNCATE,
     canonical_newline: str = CANONICAL_NEWLINE,
+    create_parents: bool = False,
 ) -> Iterator[io.StringIO]:
     """Context manager yielding an in-memory StringIO to accumulate text.
 
@@ -322,6 +364,7 @@ def open_safe_text_writer(
                 encoding=encoding,
                 file_write_mode=file_write_mode,
                 canonical_newline=canonical_newline,
+                create_parents=create_parents,
             )
             safe_writer.write(content)
             safe_writer.flush()

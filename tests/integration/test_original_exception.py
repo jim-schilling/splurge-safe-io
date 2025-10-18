@@ -67,7 +67,7 @@ def test_path_validator_original_exception_on_resolve(monkeypatch, tmp_path):
     from splurge_safe_io.exceptions import SplurgeSafeIoPathValidationError
 
     with pytest.raises(SplurgeSafeIoPathValidationError) as excinfo:
-        PathValidator.validate_path(p)
+        PathValidator.get_validated_path(p)
 
     err = excinfo.value
     assert isinstance(err.__cause__, OSError) or isinstance(err.original_exception, OSError)

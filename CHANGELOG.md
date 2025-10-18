@@ -1,5 +1,20 @@
 ## Changelog
 
+###  [2025.1.1] - 2025-10-17
+
+#### Added
+- New method `PathValidator.get_validated_path()` as a clearer and more explicit alternative to `PathValidator.validate_path()`. The new method has identical behavior but a more descriptive name.
+- New `create_parents` parameter to `SafeTextFileWriter` constructor to optionally create parent directories if they do not exist when writing to a file. Defaults to `False` for backward compatibility.
+- New unit tests to cover `PathValidator.get_validated_path()` and the `create_parents` functionality in `SafeTextFileWriter`.
+
+#### Changed
+- Updated `SafeTextFileReader` and `SafeTextFileWriter` to use `PathValidator.get_validated_path()` internally instead of `PathValidator.validate_path()`.
+- Bumped package version to `2025.1.1` in `pyproject.toml` and exposed `__version__ = "2025.1.1"` in `splurge_safe_io/__init__.py`.
+- Updated development dependencies in `pyproject.toml` to latest compatible versions.
+
+#### Deprecated
+- `PathValidator.validate_path()` is now deprecated and will be removed in a 2025.2.0 release. Users are encouraged to switch to `PathValidator.get_validated_path()` for all new code.
+
 ### [2025.1.0] - 2025-10-14
 
 #### Removed

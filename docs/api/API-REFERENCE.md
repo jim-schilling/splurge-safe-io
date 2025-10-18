@@ -59,12 +59,12 @@ Notes:
 
 ---
 
-## `splurge_safe_io.path_validator.PathValidator.validate_path`
+## `splurge_safe_io.path_validator.PathValidator.get_validated_path`
 
 Signature:
 
 ```
-PathValidator.validate_path(
+PathValidator.get_validated_path(
     file_path: str | Path,
     *,
     must_exist: bool = False,
@@ -76,7 +76,7 @@ PathValidator.validate_path(
 ) -> pathlib.Path
 ```
 
-Description: Validate a path for safety and platform correctness. Returns a resolved `Path` on success.
+Description: Validate a path for safety and platform correctness and return a resolved `Path` on success. This is the preferred and clearer API for callers that need a validated `Path` object.
 
 Raises:
 - `SplurgeSafeIoPathValidationError` for validation failures
@@ -88,8 +88,12 @@ Example:
 ```py
 from splurge_safe_io.path_validator import PathValidator
 
-p = PathValidator.validate_path('/data/foo.txt', must_exist=True, must_be_file=True)
+p = PathValidator.get_validated_path('/data/foo.txt', must_exist=True, must_be_file=True)
 ```
+
+Note on `validate_path`:
+
+The older API `PathValidator.validate_path(...)` is deprecated and will emit a `DeprecationWarning` when called. It forwards to `get_validated_path` for compatibility and will be removed in release 2025.2.0. Update your code to call `get_validated_path(...)` to avoid deprecation warnings.
 
 ---
 

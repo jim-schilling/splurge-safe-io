@@ -131,7 +131,7 @@ class SafeTextFileReader:
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         buffer_size: int = DEFAULT_BUFFER_SIZE,
     ) -> None:
-        self._file_path = PathValidator.validate_path(
+        self._file_path = PathValidator.get_validated_path(
             file_path, must_exist=True, must_be_file=True, must_be_readable=True
         )
         self._encoding = encoding or DEFAULT_ENCODING
@@ -627,7 +627,7 @@ def open_safe_text_reader(
     context yields an :class:`io.StringIO` containing the normalized
     text (LF newlines). On successful exit the buffer is closed
     automatically. If an exception occurs inside the context the
-    exception is propagated and no file-writing is performed.
+    exception is propagated and no file-reading is performed.
 
     Args:
         file_path (str | pathlib.Path): Path to the file to open.
