@@ -2,12 +2,7 @@ import pathlib
 
 import pytest
 
-from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileDecodingError,
-    SplurgeSafeIoFileEncodingError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoPathValidationError,
-)
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError, SplurgeSafeIoPathValidationError, SplurgeSafeIoValueError
 from splurge_safe_io.path_validator import PathValidator
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter
@@ -40,7 +35,7 @@ def test_must_be_readable_permission_error(mocker, tmp_path):
     monkeypatch = pytest.MonkeyPatch()
     monkeypatch.setattr(__import__("os"), "access", access_stub)
     try:
-        with pytest.raises(SplurgeSafeIoFilePermissionError):
+        with pytest.raises(SplurgeSafeIoOSError):
             PathValidator.get_validated_path(f, must_be_readable=True)
     finally:
         monkeypatch.undo()
@@ -78,7 +73,7 @@ def test_reader_unicode_decode_error(tmp_path):
     p = tmp_path / "badutf8.bin"
     # invalid utf-8 sequence
     p.write_bytes(b"\xff\xff\xff")
-    with pytest.raises(SplurgeSafeIoFileDecodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         SafeTextFileReader(p).read()
 
 
@@ -125,7 +120,7 @@ def test_writer_permission_error_on_open(mocker, tmp_path, permit_only_target_op
     p = tmp_path / "out.txt"
     # Patch builtins.open to raise PermissionError when attempting to open only for this path
     permit_only_target_open(str(p), PermissionError("nope"))
-    with pytest.raises(SplurgeSafeIoFilePermissionError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(p)
 
 
@@ -141,5 +136,5 @@ def test_writer_encoding_error_on_write(tmp_path):
 
     # Replace the internal file object with one that raises on write
     w._file_obj = BadFile()
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         w.write("data")

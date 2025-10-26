@@ -16,24 +16,19 @@ This document describes the public API for the `splurge_safe_io` package: its cl
 
 All public APIs raise exceptions defined in `splurge_safe_io.exceptions`. Each exception is a subclass of `SplurgeSafeIoError` and includes:
 
-- `message` (str): human-facing message
-- `details` (str | None): optional diagnostic details
+- `error_code` (str): semantic error code (e.g., "file-not-found", "encoding", "general", etc.)
+- `message` (str | None): human-facing message
+- `details` (dict[str, Any] | None): optional diagnostic details
 - `original_exception` (Exception | None): the original builtin exception if the library mapped from a builtin (populated when available)
 
 ### Principal error classes
 
-- `SplurgeSafeIoError` — base class
-- `SplurgeSafeIoFileOperationError` — base for file operation errors
-  - `SplurgeSafeIoFileNotFoundError`
-  - `SplurgeSafeIoFilePermissionError`
-  - `SplurgeSafeIoFileDecodingError`
-  - `SplurgeSafeIoFileEncodingError`
-  - `SplurgeSafeIoFileAlreadyExistsError`
-  - `SplurgeSafeIoStreamingError`
-  - `SplurgeSafeIoOsError`
-- `SplurgeSafeIoPathValidationError`
-- `SplurgeSafeIoParameterError`
-- `SplurgeSafeIoUnknownError`
+- `SplurgeSafeIoError` — base class for all splurge-safe-io exceptions
+- `SplurgeSafeIoOSError` — OS-level errors during file operations
+- `SplurgeSafeIoPathValidationError` — path validation failures
+- `SplurgeSafeIoValueError` — invalid parameter values
+- `SplurgeSafeIoRuntimeError` — unexpected runtime conditions
+- `SplurgeSafeIoLookupError` — text encoding/decoding errors
 
 See `splurge_safe_io.exceptions` for docstrings and hierarchy.
 
@@ -43,13 +38,19 @@ See `splurge_safe_io.exceptions` for docstrings and hierarchy.
 
 The library maps builtin/os-level exceptions to the small, stable set above. The mapping is deterministic and consistent across platforms:
 
-- `FileNotFoundError` -> `SplurgeSafeIoFileNotFoundError`
-- `PermissionError` -> `SplurgeSafeIoFilePermissionError`
-- `UnicodeDecodeError` / `UnicodeError` -> `SplurgeSafeIoFileDecodingError`
-- `UnicodeEncodeError` -> `SplurgeSafeIoFileEncodingError`
-- `FileExistsError` -> `SplurgeSafeIoFileAlreadyExistsError`
-- `OSError` (and `IOError` alias on modern Python) -> `SplurgeSafeIoOsError`
-- Any other unexpected `Exception` -> `SplurgeSafeIoUnknownError`
+- `FileNotFoundError` -> `SplurgeSafeIoOSError` with `error_code="file-not-found"`
+- `PermissionError` -> `SplurgeSafeIoOSError` with `error_code="permission-denied"`
+- `UnicodeDecodeError` / `UnicodeError` -> `SplurgeSafeIoLookupError` with `error_code="encoding"`
+- `UnicodeEncodeError` -> `SplurgeSafeIoLookupError` with `error_code="encoding"`
+- `OSError` (unmapped) -> `SplurgeSafeIoOSError` with `error_code="general"`
+- Any other unexpected `Exception` -> `SplurgeSafeIoRuntimeError` with `error_code="general"`
+
+**Error codes** provide semantic categorization:
+- `"file-not-found"` — file does not exist
+- `"permission-denied"` — insufficient permissions
+- `"encoding"` — text encoding/decoding error
+- `"path-traversal-detected"` — path validation detected traversal attack
+- `"general"` — catch-all for unmapped OS/runtime errors
 
 Notes:
 - All mapped exceptions preserve the original builtin via exception chaining (`raise ... from e`).
@@ -90,10 +91,6 @@ from splurge_safe_io.path_validator import PathValidator
 
 p = PathValidator.get_validated_path('/data/foo.txt', must_exist=True, must_be_file=True)
 ```
-
-Note on `validate_path`:
-
-The older API `PathValidator.validate_path(...)` is deprecated and will emit a `DeprecationWarning` when called. It forwards to `get_validated_path` for compatibility and will be removed in release 2025.2.0. Update your code to call `get_validated_path(...)` to avoid deprecation warnings.
 
 ---
 
@@ -174,6 +171,60 @@ for chunk in r.readlines_as_stream():
 
 ---
 
+### `splurge_safe_io.safe_text_file_reader.open_safe_text_reader_as_stream`
+
+Context manager for memory-efficient streaming of large text files.
+
+Signature:
+```
+open_safe_text_reader_as_stream(
+    file_path: Path | str,
+    *,
+    encoding: str = 'utf-8',
+    chunk_size: int = 500,
+    buffer_size: int = 32768,
+    strip: bool = False,
+    skip_header_lines: int = 0,
+    skip_footer_lines: int = 0,
+    skip_empty_lines: bool = False,
+) -> Iterator[list[str]]
+```
+
+Description: Convenience context manager that creates a `SafeTextFileReader` and streams chunked lines. Perfect for processing large files with bounded memory usage (O(chunk_size * avg_line_length) instead of O(file_size)).
+
+Arguments:
+- `file_path (Path | str)`: Path to the file to read.
+- `encoding (str)`: Text encoding for decoding. Defaults to 'utf-8'.
+- `chunk_size (int)`: Maximum number of lines per yielded chunk. Defaults to 500.
+- `buffer_size (int)`: Raw byte-read size used during streaming. Defaults to 32768 bytes.
+- `strip (bool)`: If True, strip leading/trailing whitespace from each line. Defaults to False.
+- `skip_header_lines (int)`: Number of header lines to skip. Defaults to 0.
+- `skip_footer_lines (int)`: Number of footer lines to skip. Defaults to 0.
+- `skip_empty_lines (bool)`: Whether whitespace-only lines are removed. Defaults to False.
+
+Yields:
+- `list[str]`: Chunks of normalized lines (up to `chunk_size` per chunk).
+
+Raises:
+- `SplurgeSafeIoOSError`: For OS-level file I/O errors.
+- `SplurgeSafeIoLookupError`: For encoding/decoding errors.
+- `SplurgeSafeIoRuntimeError`: For unexpected runtime errors.
+
+Example:
+
+```py
+from splurge_safe_io import open_safe_text_reader_as_stream
+
+# Process a large CSV file in memory-efficient batches
+with open_safe_text_reader_as_stream('huge_data.csv', chunk_size=1000) as reader:
+    for chunk in reader:
+        # Process batch of up to 1000 lines
+        for line in chunk:
+            process_csv_row(line)
+```
+
+---
+
 ### `splurge_safe_io.safe_text_file_writer.SafeTextFileWriter`
 
 Constructor:
@@ -198,7 +249,14 @@ Methods:
 - `.close() -> None`: Close the writer and release any resources.
 
 Context manager helper:
-- `open_safe_text_writer(file_path, *, encoding='utf-8', file_write_mode=TextFileWriteMode.CREATE_OR_TRUNCATE, canonical_newline='\n')` — yields an in-memory StringIO and writes normalized content to disk on successful exit.
+- `open_safe_text_writer(file_path, *, encoding='utf-8', file_write_mode=TextFileWriteMode.CREATE_OR_TRUNCATE, canonical_newline='\n', create_parents=False)` — yields an in-memory StringIO and writes normalized content to disk on successful exit.
+
+Parameters:
+- `file_path` — destination file path.
+- `encoding` — text encoding (default 'utf-8').
+- `file_write_mode` — write mode (default CREATE_OR_TRUNCATE).
+- `canonical_newline` — newline character to normalize to (default '\n').
+- `create_parents` — if True, create parent directories if they don't exist (default False).
 
 Example:
 
@@ -207,6 +265,10 @@ from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 with open_safe_text_writer('out.txt') as buf:
     buf.write('one\r\ntwo\n')
+
+# With parent directory creation
+with open_safe_text_writer('data/subdir/out.txt', create_parents=True) as buf:
+    buf.write('content')
 ```
 
 ---
@@ -221,7 +283,7 @@ Class/Static Methods:
 - `PathValidator.register_cleanup_policy(policy: Callable[[Path], None]) -> None`: Register a cleanup policy function. The function is called with the resolved path after all other processing. Raise `SplurgeSafeIoPathValidationError` to reject the path.
 - `PathValidator.clear_policies() -> None`: Clear all registered policies.
 - `PathValidator.get_registered_policies() -> dict[str, list[Callable]]`: Get a dictionary of registered policies by type.
-- `PathValidator.validate_path(
+- `PathValidator.get_validated_path(
     file_path: str | Path,
     *,
     must_exist: bool = False,
@@ -231,9 +293,6 @@ Class/Static Methods:
     allow_relative: bool = True,
     base_directory: str | Path | None = None,
 ) -> pathlib.Path`: Validate a path for safety and platform correctness. Returns a resolved `Path` on success.
-`
-- `PathValidator.sanitize_path(file_path: str | Path) -> str`: Sanitize a path string by removing dangerous characters. Returns the sanitized path string.
-- `PathValidator.is_path_safe(file_path: str | Path) -> bool`: Check if a path string is safe (does not contain dangerous characters). Returns True if safe, False otherwise.
 
 ---
 
@@ -249,17 +308,11 @@ Class/Static Methods:
 
 ### `splurge_safe_io.exceptions`
 - `SplurgeSafeIoError` — base class for all splurge-safe-io exceptions.
-- `SplurgeSafeIoFileOperationError` — base class for file operation errors.
-    - `SplurgeSafeIoFileNotFoundError` — file not found.
-    - `SplurgeSafeIoFilePermissionError` — permission denied.
-    - `SplurgeSafeIoFileDecodingError` — decoding error.
-    - `SplurgeSafeIoFileEncodingError` — encoding error.
-    - `SplurgeSafeIoFileAlreadyExistsError` — file already exists.
-    - `SplurgeSafeIoStreamingError` — streaming error.
-    - `SplurgeSafeIoOsError` — generic OS error.
-- `SplurgeSafeIoPathValidationError` — path validation error.
-- `SplurgeSafeIoParameterError` — invalid parameter error.
-- `SplurgeSafeIoUnknownError` — unknown error.
+- `SplurgeSafeIoOSError` — OS-level errors during file operations.
+- `SplurgeSafeIoPathValidationError` — path validation errors.
+- `SplurgeSafeIoValueError` — invalid parameter values.
+- `SplurgeSafeIoRuntimeError` — unexpected runtime errors.
+- `SplurgeSafeIoLookupError` — text encoding/decoding errors.
 
 ---
 

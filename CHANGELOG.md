@@ -1,5 +1,21 @@
 ## Changelog
 
+### [2025.2.0] - 2025-10-25
+
+#### Removed
+- `PathValidator.validate_path()` has been removed. Users must now use `PathValidator.get_validated_path()` for all path validation needs.
+
+#### Changed
+- Updated documentation and examples to remove references to the deprecated `validate_path()` method.
+- Bumped package version to `2025.2.0` in `pyproject.toml` and exposed `__version__ = "2025.2.0"` in `splurge_safe_io/__init__.py`.
+- Updated development dependencies in `pyproject.toml` to latest compatible versions.
+- Updated all exceptions to inherit from `SplurgeFrameworkError` from the `splurge-exceptions` package for better integration with the broader Splurge ecosystem.
+- Exception signatures and behaviors have changed to reflect the new base class.
+
+#### Added
+- `open_safe_text_reader_as_stream()` function has been added to the public API in `splurge_safe_io/__init__.py` to allow users to easily access the streaming text file reader functionality.
+- New unit tests to cover `open_safe_text_reader_as_stream()` functionality and ensure proper exception handling.
+
 ###  [2025.1.1] - 2025-10-17
 
 #### Added

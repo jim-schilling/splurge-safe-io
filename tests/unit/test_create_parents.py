@@ -2,10 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
-)
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError
 from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter
 
 
@@ -16,7 +13,7 @@ def test_create_parents_false_raises_when_parent_missing(tmp_path):
     assert not nested.parent.exists()
 
     # Expect opening writer without create_parents to raise an OS error when opening
-    with pytest.raises((SplurgeSafeIoOsError, SplurgeSafeIoFilePermissionError)):
+    with pytest.raises((SplurgeSafeIoOSError, SplurgeSafeIoOSError)):
         SafeTextFileWriter(nested, create_parents=False)
 
 
@@ -47,7 +44,7 @@ def test_create_parents_permission_error(monkeypatch, tmp_path):
 
     monkeypatch.setattr(Path, "mkdir", fake_mkdir)
 
-    with pytest.raises(SplurgeSafeIoFilePermissionError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(nested, create_parents=True)
 
     # Restore

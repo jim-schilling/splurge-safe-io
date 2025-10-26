@@ -18,11 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 # Local imports
-from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileNotFoundError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoPathValidationError,
-)
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError, SplurgeSafeIoPathValidationError
 
 # Module-level constants for path validation
 _MAX_PATH_LENGTH = 4096  # Maximum path length for most filesystems
@@ -98,61 +94,6 @@ class PathValidator:
     MAX_PATH_LENGTH = _MAX_PATH_LENGTH
 
     @classmethod
-    def validate_path(
-        cls,
-        file_path: str | Path,
-        *,
-        must_exist: bool = False,
-        must_be_file: bool = False,
-        must_be_readable: bool = False,
-        must_be_writable: bool = False,
-        allow_relative: bool = True,
-        base_directory: str | Path | None = None,
-    ) -> Path:
-        """Validate a filesystem path for security and correctness.
-
-        This is the central path validation routine used across the package.
-
-        Args:
-            file_path: Path or string to validate.
-            must_exist: If True, require the path to exist.
-            must_be_file: If True, require the path to be a regular file.
-            must_be_readable: If True, check read permission via os.access().
-            allow_relative: If False, disallow relative paths.
-            base_directory: Optional directory to resolve relative paths
-                against and to restrict the resolved path to.
-
-        Returns:
-            pathlib.Path: Resolved and normalized path.
-
-        Raises:
-            SplurgeSafeIoPathValidationError: If any validation rule fails.
-            SplurgeSafeIoFileNotFoundError: If must_exist is True and file is missing.
-            SplurgeSafeIoFilePermissionError: If must_be_readable is True and the file is not readable.
-        """
-        # Deprecated wrapper: prefer `get_validated_path` which returns a
-        # validated and resolved pathlib.Path. ``validate_path`` will be
-        # removed in release 2025.2.0.
-        import warnings
-
-        warnings.warn(
-            "PathValidator.validate_path is deprecated; use PathValidator.get_validated_path(...) instead. "
-            "Scheduled removal: 2025.2.0",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        return cls.get_validated_path(
-            file_path,
-            must_exist=must_exist,
-            must_be_file=must_be_file,
-            must_be_readable=must_be_readable,
-            must_be_writable=must_be_writable,
-            allow_relative=allow_relative,
-            base_directory=base_directory,
-        )
-
-    @classmethod
     def get_validated_path(
         cls,
         file_path: str | Path,
@@ -166,9 +107,22 @@ class PathValidator:
     ) -> Path:
         """Validate and return a resolved pathlib.Path.
 
-        This is the primary implementation: it performs the same checks
-        that previously lived in ``validate_path`` but is named to make
-        it obvious the function returns a validated Path object.
+        Args:
+            file_path (str | Path): The file path to validate
+            must_exist (bool): If True, the path must exist
+            must_be_file (bool): If True, the path must be a file (not directory)
+            must_be_readable (bool): If True, the file must be readable
+            must_be_writable (bool): If True, the file must be writable
+            allow_relative (bool): If False, relative paths are rejected
+            base_directory (str | Path | None): If provided, the resolved path
+                must reside within this base directory
+
+        Returns:
+            Path: The validated and resolved Path object.
+
+        Raises:
+            SplurgeSafeIoPathValidationError: If the path fails validation checks
+            SplurgeSafeIoOSError: If file existence fails or permission checks fail
         """
         # Convert to Path object
         path = Path(file_path) if isinstance(file_path, str) else file_path
@@ -187,8 +141,10 @@ class PathValidator:
 
         # Handle relative paths
         if not path.is_absolute() and not allow_relative:
-            raise SplurgeSafeIoPathValidationError(
-                f"Relative paths are not allowed: {path}", details="Set allow_relative=True to allow relative paths"
+            raise (
+                SplurgeSafeIoPathValidationError(
+                    error_code="relative-path-not-allowed", message=f"Relative paths are not allowed: {path}"
+                ).add_suggestion("Use an absolute path or set allow_relative=True if appropriate.")
             )
 
         # Resolve path (handles symlinks and normalizes)
@@ -205,54 +161,80 @@ class PathValidator:
                     resolved_path.relative_to(base_path)
                 except ValueError:
                     raise SplurgeSafeIoPathValidationError(
-                        f"Path {path} resolves outside base directory {base_directory}",
-                        details="Path traversal detected",
+                        error_code="path-traversal-detected",
+                        message=f"Path {path} resolves outside base directory {base_directory}",
                     ) from None
             else:
                 resolved_path = path.resolve()
         except (OSError, RuntimeError) as e:
-            raise SplurgeSafeIoPathValidationError(
-                f"Failed to resolve path {path}: {e}",
-                details="Check if path contains invalid characters or symlinks",
-                original_exception=e,
+            raise (
+                SplurgeSafeIoPathValidationError(
+                    error_code="path-resolution-failed", message=f"Failed to resolve path {path}"
+                ).add_suggestion("Ensure the path contains valid characters and does not contain problematic symlinks.")
             ) from e
 
         # Check if file exists
         if must_exist and not resolved_path.exists():
-            raise SplurgeSafeIoFileNotFoundError(
-                f"File does not exist: {resolved_path}", details="Set must_exist=False to allow non-existent files"
+            raise (
+                SplurgeSafeIoOSError(error_code="file-not-found", message=f"File does not exist: {resolved_path}")
+                .add_suggestion("Verify the file path is correct.")
+                .add_suggestion("Create the file if it is missing.")
+                .add_suggestion("Set must_exist=False if the file is expected to be created later.")
             )
 
         # Check if it's a file (not directory)
         if must_be_file and resolved_path.exists() and not resolved_path.is_file():
             raise SplurgeSafeIoPathValidationError(
-                f"Path is not a file: {resolved_path}", details="Path exists but is not a regular file"
+                error_code="not-a-file", message=f"Path is not a file: {resolved_path}"
             )
 
         # Check if file is readable
         if must_be_readable:
             if not resolved_path.exists():
-                raise SplurgeSafeIoFileNotFoundError(
-                    f"Cannot check readability of non-existent file: {resolved_path}",
-                    details="File must exist to check readability",
+                raise (
+                    SplurgeSafeIoOSError(
+                        error_code="file-not-found",
+                        message=f"Cannot check readability of non-existent file: {resolved_path}",
+                    )
+                    .add_suggestion("Ensure the file exists before checking readability.")
+                    .add_suggestion(
+                        "Set must_be_readable=False and must_exist=False if the file is not expected to exist."
+                    )
                 )
 
             if not os.access(resolved_path, os.R_OK):
-                raise SplurgeSafeIoFilePermissionError(
-                    f"File is not readable: {resolved_path}", details="Check file permissions"
+                raise (
+                    SplurgeSafeIoOSError(
+                        error_code="permission-denied", message=f"File is not readable: {resolved_path}"
+                    )
+                    .add_suggestion("Check file permissions.")
+                    .add_suggestion("Ensure the file is not locked by another process.")
                 )
 
         # Check if file is writable
         if must_be_writable:
             if not resolved_path.exists():
-                raise SplurgeSafeIoFileNotFoundError(
-                    f"Cannot check writability of non-existent file: {resolved_path}",
-                    details="File must exist to check writability",
+                raise (
+                    SplurgeSafeIoOSError(
+                        error_code="file-not-found",
+                        message=f"Cannot check writability of non-existent file: {resolved_path}",
+                    )
+                    .add_suggestion("Ensure the file exists before checking writability.")
+                    .add_suggestion(
+                        "Set must_be_writable=False and must_exist=False if the file is not expected to exist."
+                    )
                 )
 
             if not os.access(resolved_path, os.W_OK):
-                raise SplurgeSafeIoFilePermissionError(
-                    f"File is not writable: {resolved_path}", details="Check file permissions"
+                raise (
+                    SplurgeSafeIoOSError(
+                        error_code="permission-denied", message=f"File is not writable: {resolved_path}"
+                    )
+                    .add_suggestion("Check file permissions.")
+                    .add_suggestion("Ensure the file is not read-only or locked by another process.")
+                    .add_suggestion(
+                        "Set must_be_writable=False and must_exist=False if the file is not expected to exist."
+                    )
                 )
 
         return resolved_path
@@ -278,8 +260,9 @@ class PathValidator:
             idx = path_str.find(char)
             if idx != -1:
                 raise SplurgeSafeIoPathValidationError(
-                    f"Path contains dangerous character: {repr(char)}",
-                    details=f"Character at position {idx}",
+                    error_code="dangerous-character",
+                    message=f"Path contains dangerous character: {repr(char)}",
+                    details={"Character at position": idx},
                 )
 
         # Programmatic check for C0 control characters (U+0000..U+001F).
@@ -288,17 +271,17 @@ class PathValidator:
         for idx, ch in enumerate(path_str):
             if ord(ch) < 32:
                 raise SplurgeSafeIoPathValidationError(
-                    f"Path contains control character: U+{ord(ch):04X}",
-                    details=f"Character at position {idx}",
+                    error_code="control-character",
+                    message=f"Path contains control character: U+{ord(ch):04X}",
+                    details={"Character at position": idx},
                 )
 
         # Special handling for colons - only allow them in Windows drive letters (e.g., C:)
         if ":" in path_str:
             if not cls._is_valid_windows_drive_pattern(path_str):
                 raise SplurgeSafeIoPathValidationError(
-                    "Path contains colon in invalid position",
-                    details="Colons are only allowed in Windows drive letters (e.g., C: or C:\\)",
-                )
+                    error_code="invalid-colon-position", message="Path contains colon in invalid position"
+                ).add_suggestion("Colons are only allowed in Windows drive letters (e.g., C: or C:\\)")
 
     @classmethod
     def _check_path_traversal(cls, path_str: str) -> None:
@@ -324,9 +307,8 @@ class PathValidator:
         """
         if len(path_str) > cls.MAX_PATH_LENGTH:
             raise SplurgeSafeIoPathValidationError(
-                f"Path is too long: {len(path_str)} characters",
-                details=f"Maximum allowed length is {cls.MAX_PATH_LENGTH} characters",
-            )
+                error_code="path-too-long", message=f"Path is too long: {len(path_str)} characters"
+            ).add_suggestion("Consider shortening the path or using a different file name.")
 
     @classmethod
     def sanitize_filename(cls, filename: str) -> str:
@@ -370,7 +352,7 @@ class PathValidator:
             True if path is safe, False otherwise
         """
         try:
-            cls.validate_path(file_path)
+            cls.get_validated_path(file_path)
             return True
-        except (SplurgeSafeIoPathValidationError, SplurgeSafeIoFileNotFoundError, SplurgeSafeIoFilePermissionError):
+        except (SplurgeSafeIoPathValidationError, SplurgeSafeIoOSError):
             return False

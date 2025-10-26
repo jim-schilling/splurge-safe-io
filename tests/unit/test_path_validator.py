@@ -1,6 +1,6 @@
 import pytest
 
-from splurge_safe_io.exceptions import SplurgeSafeIoFileNotFoundError, SplurgeSafeIoPathValidationError
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError, SplurgeSafeIoPathValidationError
 from splurge_safe_io.path_validator import PathValidator
 
 
@@ -13,7 +13,7 @@ def test_validate_existing_file(tmp_path):
 
 def test_nonexistent_file_raises(tmp_path):
     f = tmp_path / "nope.txt"
-    with pytest.raises(SplurgeSafeIoFileNotFoundError):
+    with pytest.raises(SplurgeSafeIoOSError):
         PathValidator.get_validated_path(str(f), must_exist=True)
 
 
@@ -43,7 +43,7 @@ def test_base_directory_restriction(tmp_path):
 def test_register_pre_resolution_policy(tmp_path):
     def deny_dotdot(p: str):
         if ".." in p:
-            raise SplurgeSafeIoPathValidationError("dotdot not allowed")
+            raise SplurgeSafeIoPathValidationError("dotdot-not-allowed")
 
     PathValidator.register_pre_resolution_policy(deny_dotdot)
     with pytest.raises(SplurgeSafeIoPathValidationError):

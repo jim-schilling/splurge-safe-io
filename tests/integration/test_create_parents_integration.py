@@ -1,6 +1,6 @@
 import pytest
 
-from splurge_safe_io.exceptions import SplurgeSafeIoFilePermissionError, SplurgeSafeIoOsError
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError
 from splurge_safe_io.safe_text_file_writer import open_safe_text_writer
 
 
@@ -20,6 +20,6 @@ def test_open_safe_text_writer_create_parents_false_raises(tmp_path):
     nested = tmp_path / "nested" / "subdir" / "out.txt"
     assert not nested.parent.exists()
 
-    with pytest.raises((SplurgeSafeIoOsError, SplurgeSafeIoFilePermissionError)):
+    with pytest.raises(SplurgeSafeIoOSError):
         with open_safe_text_writer(nested, create_parents=False) as buf:
             buf.write("x\n")
