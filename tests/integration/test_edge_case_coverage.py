@@ -6,11 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileAlreadyExistsError,
-    SplurgeSafeIoFileEncodingError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
+    SplurgeSafeIoOSError,
     SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoValueError,
 )
 from splurge_safe_io.path_validator import PathValidator
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
@@ -34,7 +32,7 @@ def test_validate_path_resolve_failure(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(pathlib.Path, "resolve", _bad_resolve)
     with pytest.raises(SplurgeSafeIoPathValidationError) as excinfo:
         PathValidator.get_validated_path(tmp_path / "x", must_exist=False)
-    assert isinstance(excinfo.value.original_exception, OSError)
+    assert isinstance(excinfo.value.__cause__, OSError)
 
 
 def test_validate_dangerous_character_and_length():
@@ -98,7 +96,7 @@ def test_reader_footer_header_finalization(tmp_path: Path):
 def test_writer_create_new_file_exists(tmp_path: Path):
     dest = tmp_path / "exists.txt"
     dest.write_text("x")
-    with pytest.raises(SplurgeSafeIoFileAlreadyExistsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(dest, file_write_mode=TextFileWriteMode.CREATE_NEW)
 
 
@@ -111,18 +109,18 @@ def test_writer_write_unicode_and_os_errors(monkeypatch, tmp_path: Path):
         raise UnicodeEncodeError("ascii", "", 0, 1, "reason")
 
     monkeypatch.setattr(w, "_file_obj", SimpleNamespace(write=raise_unicode, flush=lambda: None, close=lambda: None))
-    with pytest.raises(SplurgeSafeIoFileEncodingError) as excinfo:
+    with pytest.raises(SplurgeSafeIoValueError) as excinfo:
         w.write("é")
-    assert isinstance(excinfo.value.original_exception, UnicodeEncodeError)
+    assert isinstance(excinfo.value.__cause__, UnicodeEncodeError)
 
     # Simulate underlying write raising OSError
     def raise_os(*args, **kwargs):
         raise OSError("boom")
 
     monkeypatch.setattr(w, "_file_obj", SimpleNamespace(write=raise_os, flush=lambda: None, close=lambda: None))
-    with pytest.raises(SplurgeSafeIoOsError) as excinfo2:
+    with pytest.raises(SplurgeSafeIoOSError) as excinfo2:
         w.write("ok")
-    assert isinstance(excinfo2.value.original_exception, OSError)
+    assert isinstance(excinfo2.value.__cause__, OSError)
 
 
 def test_writer_writelines_and_flush_errors(monkeypatch, tmp_path: Path):
@@ -136,7 +134,7 @@ def test_writer_writelines_and_flush_errors(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(
         w, "_file_obj", SimpleNamespace(write=lambda s: raise_unicode(), flush=lambda: None, close=lambda: None)
     )
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         w.writelines(["a", "b"])  # pragma: no cover - behavior branch
 
     # flush -> OSError
@@ -145,7 +143,7 @@ def test_writer_writelines_and_flush_errors(monkeypatch, tmp_path: Path):
         "_file_obj",
         SimpleNamespace(write=lambda s: None, flush=lambda: (_ for _ in ()).throw(OSError("boom")), close=lambda: None),
     )
-    with pytest.raises(SplurgeSafeIoOsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         w.flush()
 
 
@@ -159,7 +157,7 @@ def test_original_exception_propagation(tmp_path: Path, monkeypatch, permit_only
     monkeypatch.setattr(pathlib.Path, "resolve", _bad_resolve)
     with pytest.raises(SplurgeSafeIoPathValidationError) as ei:
         PathValidator.get_validated_path(tmp_path / "x")
-    assert isinstance(ei.value.original_exception, OSError)
+    assert isinstance(ei.value.__cause__, OSError)
 
     # Restore resolve so subsequent operations are normal
     monkeypatch.setattr(pathlib.Path, "resolve", original_resolve)
@@ -169,6 +167,6 @@ def test_original_exception_propagation(tmp_path: Path, monkeypatch, permit_only
     # This will raise PermissionError only for the target path
     permit_target = str(tmp_path / "a.txt")
     permit_only_target_open(permit_target, PermissionError("nope"))
-    with pytest.raises(SplurgeSafeIoFilePermissionError) as e2:
+    with pytest.raises(SplurgeSafeIoOSError) as e2:
         SafeTextFileWriter(tmp_path / "a.txt")
-    assert isinstance(e2.value.original_exception, PermissionError)
+    assert isinstance(e2.value.__cause__, PermissionError)

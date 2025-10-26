@@ -27,12 +27,9 @@ from typing import cast
 
 from splurge_safe_io.constants import CANONICAL_NEWLINE, DEFAULT_ENCODING
 from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileAlreadyExistsError,
-    SplurgeSafeIoFileEncodingError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
-    SplurgeSafeIoParameterError,
-    SplurgeSafeIoUnknownError,
+    SplurgeSafeIoLookupError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoRuntimeError,
 )
 from splurge_safe_io.path_validator import PathValidator
 
@@ -65,11 +62,11 @@ class SafeTextFileWriter:
 
     Raises:
         SplurgeSafeIoPathValidationError: If the provided path fails validation checks.
-        SplurgeSafeIoFileAlreadyExistsError: If mode is CREATE_NEW and the file exists.
-        SplurgeSafeIoFileEncodingError: If encoding fails.
-        SplurgeSafeIoOsError: For unexpected OS-level errors.
-        SplurgeSafeIoFilePermissionError: If the file cannot be opened due to permission issues.
-        SplurgeSafeIoUnknownError: For other unexpected errors.
+        SplurgeSafeIoOSError: If mode is CREATE_NEW and the file exists.
+        SplurgeSafeIoLookupError: If encoding fails.
+        SplurgeSafeIoOSError: For unexpected OS-level errors.
+        SplurgeSafeIoOSError: If the file cannot be opened due to permission issues.
+        SplurgeSafeIoRuntimeError: For other unexpected errors.
     """
 
     def __init__(
@@ -122,11 +119,11 @@ class SafeTextFileWriter:
             io.TextIOBase: Opened text file object ready for writes.
 
         Raises:
-            SplurgeSafeIoFileAlreadyExistsError: If the file exists and mode is CREATE_NEW.
-            SplurgeSafeIoFileEncodingError: If encoding fails when opening the file.
-            SplurgeSafeIoFilePermissionError: If permission errors occur.
-            SplurgeSafeIoOsError: For other OS-level errors.
-            SplurgeSafeIoUnknownError: For unexpected errors.
+            SplurgeSafeIoOSError: If the file exists and mode is CREATE_NEW.
+            SplurgeSafeIoLookupError: If encoding fails when opening the file.
+            SplurgeSafeIoOSError: If permission errors occur.
+            SplurgeSafeIoOSError: For other OS-level errors.
+            SplurgeSafeIoRuntimeError: For unexpected errors.
         """
         try:
             # open with newline="" to allow us to manage newline normalization
@@ -134,23 +131,32 @@ class SafeTextFileWriter:
             # cast to TextIOBase for precise typing
             return cast(io.TextIOBase, fp)
         except FileExistsError as exc:
-            raise SplurgeSafeIoFileAlreadyExistsError(
-                f"File already exists: {self._file_path}", details=str(exc), original_exception=exc
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="file-already-exists", message=f"File already exists: {self._file_path}"
+                )
+                .add_suggestion("Ensure the target file does not exist before using CREATE_NEW mode.")
+                .add_suggestion("Change the file_write_mode to CREATE_OR_TRUNCATE to overwrite.")
+                .add_suggestion("Change the file_write_mode to CREATE_OR_APPEND to append.")
             ) from exc  # pragma: no cover
         except UnicodeEncodeError as exc:
-            raise SplurgeSafeIoFileEncodingError(str(exc), original_exception=exc) from exc  # pragma: no cover
+            raise SplurgeSafeIoLookupError(
+                error_code="encoding", message=f"Encoding error opening file: {self._file_path} : {str(exc)}"
+            ) from exc  # pragma: no cover
         except PermissionError as exc:
             # Catch PermissionError explicitly before the more general OSError
-            raise SplurgeSafeIoFilePermissionError(
-                f"Permission error opening file: {self._file_path}", details=str(exc), original_exception=exc
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="permission-denied", message=f"Permission error opening file: {self._file_path}"
+                ).add_suggestion("Check the file permissions and ensure you have write access to the target path.")
             ) from exc  # pragma: no cover
         except OSError as exc:
-            raise SplurgeSafeIoOsError(
-                f"OS error opening file: {self._file_path}", details=str(exc), original_exception=exc
+            raise SplurgeSafeIoOSError(
+                error_code="general", message=f"General OS error opening file: {self._file_path} : {str(exc)}"
             ) from exc  # pragma: no cover
         except Exception as exc:
-            raise SplurgeSafeIoUnknownError(
-                f"Unexpected error opening file: {self._file_path}", details=str(exc), original_exception=exc
+            raise SplurgeSafeIoRuntimeError(
+                error_code="general", message=f"General error opening file: {self._file_path} : {str(exc)}"
             ) from exc  # pragma: no cover
 
     def _create_parents_impl(self) -> None:
@@ -160,9 +166,9 @@ class SafeTextFileWriter:
         errors to the package's exception hierarchy.
 
         Raises:
-            SplurgeSafeIoFilePermissionError: If directory creation is denied.
-            SplurgeSafeIoOsError: For other OS-level errors during creation.
-            SplurgeSafeIoUnknownError: For unexpected errors.
+            SplurgeSafeIoOSError: If directory creation is denied.
+            SplurgeSafeIoOSError: For other OS-level errors during creation.
+            SplurgeSafeIoRuntimeError: For unexpected errors.
         """
         try:
             parent_dir = self._file_path.parent
@@ -171,22 +177,22 @@ class SafeTextFileWriter:
             # this is effectively a no-op.
             parent_dir.mkdir(parents=True, exist_ok=True)
         except PermissionError as exc:
-            raise SplurgeSafeIoFilePermissionError(
-                f"Permission error creating parent directories for: {self._file_path}",
-                details=str(exc),
-                original_exception=exc,
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="permission-denied",
+                    message=f"Permission error creating parent directories for: {self._file_path} : {str(exc)}",
+                ).add_suggestion(
+                    "Check the directory permissions and ensure you have write access to create directories."
+                )
             ) from exc
         except OSError as exc:
-            raise SplurgeSafeIoOsError(
-                f"OS error creating parent directories for: {self._file_path}",
-                details=str(exc),
-                original_exception=exc,
+            raise SplurgeSafeIoOSError(
+                error_code="general",
+                message=f"General OS error creating parent directories for: {self._file_path} : {str(exc)}",
             ) from exc
         except Exception as exc:
-            raise SplurgeSafeIoUnknownError(
-                f"Unexpected error creating parent directories for: {self._file_path}",
-                details=str(exc),
-                original_exception=exc,
+            raise SplurgeSafeIoRuntimeError(
+                error_code="general", message=f"General error creating parent directories for: {self._file_path}"
             ) from exc  # pragma: no cover
 
     def write(self, text: str) -> int:
@@ -200,9 +206,10 @@ class SafeTextFileWriter:
             int: Number of characters written to the underlying file object.
 
         Raises:
-            SplurgeSafeIoFileEncodingError: If encoding fails.
-            SplurgeSafeIoOsError: For OS-level write errors.
-            SplurgeSafeIoUnknownError: For unexpected errors.
+            SplurgeSafeIoLookupError: If encoding fails.
+            SplurgeSafeIoRuntimeError: If the file is not opened.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For unexpected errors.
         """
         # Normalize outside the lock to minimize lock hold time
         normalized_text = text.replace("\r\n", self._canonical_newline).replace("\r", self._canonical_newline)
@@ -211,18 +218,23 @@ class SafeTextFileWriter:
         # close()/flush() cannot race with this write operation.
         with self._lock:
             if self._file_obj is None:
-                raise SplurgeSafeIoParameterError("File not opened")
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="file-not-opened", message=f"File not opened: {self._file_path}"
+                )
             try:
                 return self._file_obj.write(normalized_text)
             except UnicodeEncodeError as exc:
-                raise SplurgeSafeIoFileEncodingError(str(exc), original_exception=exc) from exc  # pragma: no cover
+                raise SplurgeSafeIoLookupError(
+                    error_code="encoding", message=f"Encoding error writing to file: {self._file_path} : {str(exc)}"
+                ) from exc  # pragma: no cover
             except OSError as exc:
-                raise SplurgeSafeIoOsError(
-                    "OS error writing to file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoOSError(
+                    error_code="general",
+                    message=f"General OS error writing to file: {self._file_path} : {str(exc)}",
                 ) from exc  # pragma: no cover
             except Exception as exc:
-                raise SplurgeSafeIoUnknownError(
-                    "Unexpected error writing to file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="general", message=f"General error writing to file: {self._file_path} : {str(exc)}"
                 ) from exc  # pragma: no cover
 
     def writelines(self, lines: Iterable[str]) -> None:
@@ -237,9 +249,10 @@ class SafeTextFileWriter:
             None
 
         Raises:
-            SplurgeSafeIoFileEncodingError: If encoding fails.
-            SplurgeSafeIoOsError: For OS-level write errors.
-            SplurgeSafeIoUnknownError: For unexpected errors.
+            SplurgeSafeIoLookupError: If encoding fails.
+            SplurgeSafeIoOSError: For unexpected OS-level write errors.
+            SplurgeSafeIoRuntimeError: If the file is not opened.
+            SplurgeSafeIoRuntimeError: For unexpected errors.
         """
         if lines is None:
             return
@@ -261,41 +274,50 @@ class SafeTextFileWriter:
         combined = "".join(normalized_parts)
         with self._lock:
             if self._file_obj is None:
-                raise SplurgeSafeIoParameterError("File not opened")
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="file-not-opened", message=f"File not opened: {self._file_path}"
+                )
             try:
                 # Write combined parts; do not return the underlying io write value
                 self._file_obj.write(combined)
                 return None
             except UnicodeEncodeError as exc:
-                raise SplurgeSafeIoFileEncodingError(str(exc), original_exception=exc) from exc  # pragma: no cover
+                raise SplurgeSafeIoLookupError(
+                    error_code="encoding", message=f"Encoding error writing to file: {self._file_path} : {str(exc)}"
+                ) from exc  # pragma: no cover
             except OSError as exc:
-                raise SplurgeSafeIoOsError(
-                    "OS error writing to file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoOSError(
+                    error_code="general",
+                    message=f"General OS error writing to file: {self._file_path} : {str(exc)}",
                 ) from exc  # pragma: no cover
             except Exception as exc:
-                raise SplurgeSafeIoUnknownError(
-                    "Unexpected error writing to file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="general", message=f"General error writing to file: {self._file_path} : {str(exc)}"
                 ) from exc  # pragma: no cover
 
     def flush(self) -> None:
         """Flush buffered writes to the underlying file.
 
         Raises:
-            SplurgeSafeIoOsError: For OS-level errors during flush.
-            SplurgeSafeIoUnknownError: For unexpected errors.
+            SplurgeSafeIoRuntimeError: If the file is not opened.
+            SplurgeSafeIoOSError: For OS-level errors during flush.
+            SplurgeSafeIoRuntimeError: For unexpected errors.
         """
         with self._lock:
             if self._file_obj is None:
-                raise SplurgeSafeIoParameterError("File not opened")
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="file-not-opened", message=f"File not opened: {self._file_path}"
+                )
             try:
                 self._file_obj.flush()
             except OSError as exc:
-                raise SplurgeSafeIoOsError(
-                    "OS error flushing file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoOSError(
+                    error_code="general",
+                    message=f"General OS error flushing file: {self._file_path} : {str(exc)}",
                 ) from exc  # pragma: no cover
             except Exception as exc:
-                raise SplurgeSafeIoUnknownError(
-                    "Unexpected error flushing file", details=str(exc), original_exception=exc
+                raise SplurgeSafeIoRuntimeError(
+                    error_code="general", message=f"General error flushing file: {self._file_path} : {str(exc)}"
                 ) from exc  # pragma: no cover
 
     def close(self) -> None:
@@ -335,12 +357,13 @@ def open_safe_text_writer(
         canonical_newline: Newline sequence to write (default: CANONICAL_NEWLINE).
 
     Raises:
-        SplurgeSafeIoFileAlreadyExistsError: If the file exists and mode is CREATE_NEW.
-        SplurgeSafeIoFileEncodingError: If the file cannot be opened with the requested encoding.
-        SplurgeSafeIoOsError: If a general OS error occurs.
-        SplurgeSafeIoFilePermissionError: If the file cannot be opened due to permission issues.
-        SplurgeSafeIoFileOperationError: If an unexpected I/O error occurs.
-        SplurgeSafeIoUnknownError: If an unexpected error occurs.
+        SplurgeSafeIoOSError: If the file exists and mode is CREATE_NEW.
+        SplurgeSafeIoValueError: If the file cannot be opened with the requested encoding.
+        SplurgeSafeIoRuntimeError: If the file is not open.
+        SplurgeSafeIoOSError: If a general OS error occurs.
+        SplurgeSafeIoOSError: If the file cannot be opened due to permission issues.
+        SplurgeSafeIoOSError: If an unexpected I/O error occurs.
+        SplurgeSafeIoRuntimeError: If an unexpected error occurs.
 
     Yields:
         io.StringIO: Buffer to write textual content into.

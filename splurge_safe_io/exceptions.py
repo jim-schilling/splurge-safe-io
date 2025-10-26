@@ -9,155 +9,89 @@ Module contents are intentionally lightweight: exceptions are primarily
 containers for structured error information.
 
 Example:
-    raise SplurgeSafeIoFileNotFoundError("File not found", details="/data/foo.csv")
+    raise SplurgeSafeIoFileNotFoundError(
+        error_code="file-not-found",
+        message="Cannot locate specified file",
+        details={"path": "/data/foo.csv"}
+    )
 
 License: MIT
 
 Copyright (c) 2025 Jim Schilling
 """
 
+from splurge_exceptions import SplurgeFrameworkError  # type: ignore[import]
 
-class SplurgeSafeIoError(Exception):
-    """Base exception carrying a message and optional details.
+
+class SplurgeSafeIoError(SplurgeFrameworkError):
+    """Base exception for splurge-safe-io package errors.
+
+    Inherits from SplurgeFrameworkError to provide structured error handling
+    with semantic error codes and hierarchical domain organization.
 
     Args:
-        message (str): Primary error message to display to the user.
-        details (str | None): Optional machine-readable details useful for debugging.
-        original_exception (BaseException | None): Optional underlying builtin/exception that triggered this wrapper.
+        error_code (str): Semantic error code (e.g., "file-not-found", "invalid-encoding")
+        message (str | None): Human-readable error message
+        details (dict[str, Any] | None): Additional error contextual information
 
-    Attributes:
-        message: User-facing error message.
-        details: Optional additional diagnostic information.
+    Example:
+        >>> raise SplurgeSafeIoPathValidationError(
+        ...     error_code="file-not-found",
+        ...     message="Cannot locate specified file",
+        ...     details={"path": "/data/foo.csv"}
+        ... )
     """
 
-    def __init__(
-        self,
-        message: str,
-        *,
-        details: str | None = None,
-        original_exception: BaseException | None = None,
-    ) -> None:
-        self.message = message
-        self.details = details
-        # Preserve the underlying builtin exception for callers that
-        # want programmatic access to the original error. Prefer passing
-        # ``original_exception`` to the constructor when raising.
-        self.original_exception: BaseException | None = original_exception
-        super().__init__(self.message)
+    _domain = "splurge-safe-io"
 
 
-# New-style exception names. Use a SplurgeSafeIo* prefix to avoid colliding with
-# Python builtins. We keep the Splurge* aliases for backward compatibility.
-
-
-class SplurgeSafeIoFileOperationError(SplurgeSafeIoError):
-    """Base exception for file operation errors.
-
-    Used as a parent for file-related conditions such as not found,
-    permission denied, or encoding issues.
-    """
-
-
-class SplurgeSafeIoFileNotFoundError(SplurgeSafeIoFileOperationError):
-    """Raised when an expected file cannot be located.
-
-    This typically maps to ``FileNotFoundError`` semantics but uses the
-    package-specific exception hierarchy so callers can distinguish
-    file errors from other error types.
-    """
-
-
-class SplurgeSafeIoFilePermissionError(SplurgeSafeIoFileOperationError):
-    """Raised for permission or access-related file errors.
-
-    For example, attempting to open a file without read permission will
-    raise this exception.
-    """
-
-
-class SplurgeSafeIoFileDecodingError(SplurgeSafeIoFileOperationError):
-    """Raised when decoding a text file fails.
-
-    The exception typically wraps the underlying decoding error and
-    provides a descriptive message and optional details for diagnostics.
-    """
-
-
-class SplurgeSafeIoFileEncodingError(SplurgeSafeIoFileOperationError):
-    """Raised when decoding or encoding a text file fails.
-
-    The exception typically wraps the underlying decoding error and
-    provides a descriptive message and optional details for diagnostics.
-    """
-
-
-class SplurgeSafeIoStreamingError(SplurgeSafeIoFileOperationError):
-    """Raised for errors during streaming (e.g., partial reads, IO interruptions)."""
-
-
-class SplurgeSafeIoOsError(SplurgeSafeIoFileOperationError):
-    """Raised for unexpected OS-level errors during file operations.
-
-    This serves as a catch-all for unanticipated ``OSError`` conditions
-    not covered by more specific exceptions.
-    """
-
-
-class SplurgeSafeIoFileAlreadyExistsError(SplurgeSafeIoFileOperationError):
-    """Raised when a file that is being created already exists.
-
-    This typically maps to ``FileExistsError`` semantics but uses the
-    package-specific exception hierarchy so callers can distinguish
-    file errors from other error types.
-    """
-
-
-class SplurgeSafeIoRuntimeError(SplurgeSafeIoError):
-    """Raised for unexpected runtime errors within the package.
-
-    This serves as a catch-all for unanticipated ``RuntimeError`` conditions
-    not covered by more specific exceptions.
-    """
-
-
-class SplurgeSafeIoUnknownError(SplurgeSafeIoError):
-    """Raised for completely unknown errors within the package.
-
-    This serves as a catch-all for unanticipated conditions
-    not covered by more specific exceptions.
-    """
-
-
-class SplurgeSafeIoConfigurationError(SplurgeSafeIoError):
-    """Raised when an invalid configuration is provided to an API.
-
-    Examples include invalid chunk sizes, missing delimiters, or mutually
-    exclusive options supplied together.
-    """
-
-
-class SplurgeSafeIoValidationError(SplurgeSafeIoError):
-    """Base exception for validation errors.
-
-    Used as a parent for parameter, range, format, and other validation issues.
-    """
-
-
-class SplurgeSafeIoParameterError(SplurgeSafeIoValidationError):
-    """Raised when a function or method receives invalid parameters.
-
-    Use this for invalid types, missing required values, or arguments that
-    violate expected constraints.
-    """
-
-
-class SplurgeSafeIoRangeError(SplurgeSafeIoValidationError):
-    """Raised when a value falls outside an expected numeric or length range."""
-
-
-class SplurgeSafeIoPathValidationError(SplurgeSafeIoValidationError):
+class SplurgeSafeIoPathValidationError(SplurgeSafeIoError):
     """Raised when a provided filesystem path fails validation checks.
 
     Use this exception for path traversal, dangerous characters, or other
     validation failures detected by the path validation utilities.
     """
+
+    _domain = "splurge-safe-io.path-validation"
+
+
+class SplurgeSafeIoOSError(SplurgeSafeIoError):
+    """Raised for OS-level errors encountered during file operations.
+
+    Use this exception to wrap underlying OSErrors encountered during
+    file reading, writing, or other filesystem interactions.
+    """
+
+    _domain = "splurge-safe-io.os"
+
+
+class SplurgeSafeIoValueError(SplurgeSafeIoError):
+    """Raised for value-related errors in splurge-safe-io operations.
+
+    Use this exception to indicate invalid parameter values, encoding
+    issues, or other value-related problems.
+    """
+
+    _domain = "splurge-safe-io.value"
+
+
+class SplurgeSafeIoRuntimeError(SplurgeSafeIoError):
+    """Raised for runtime errors during splurge-safe-io operations.
+
+    Use this exception to indicate unexpected runtime conditions,
+    such as invalid state or operation failures.
+    """
+
+    _domain = "splurge-safe-io.runtime"
+
+
+class SplurgeSafeIoLookupError(SplurgeSafeIoValueError):
+    """Raised for lookup errors in splurge-safe-io operations.
+
+    Use this exception to indicate problems with text encoding or decoding,
+    such as invalid byte sequences or unsupported encodings.
+    Use this exception to indicate lookup failures, such as missing keys
+    in dictionaries or failed searches.
+    """
+
+    _domain = "splurge-safe-io.lookup"

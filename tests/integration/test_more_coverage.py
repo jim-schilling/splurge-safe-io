@@ -1,12 +1,6 @@
 import pytest
 
-from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileAlreadyExistsError,
-    SplurgeSafeIoFileDecodingError,
-    SplurgeSafeIoFileEncodingError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoPathValidationError,
-)
+from splurge_safe_io.exceptions import SplurgeSafeIoOSError, SplurgeSafeIoPathValidationError, SplurgeSafeIoValueError
 from splurge_safe_io.path_validator import PathValidator
 from splurge_safe_io.safe_text_file_reader import (
     SafeTextFileReader,
@@ -25,7 +19,7 @@ def test_pre_resolution_policy_registration_and_clear():
     # Register a policy that rejects any path containing 'forbidden'
     def reject_forbidden(p: str):
         if "forbidden" in p:
-            raise SplurgeSafeIoPathValidationError("forbidden path")
+            raise SplurgeSafeIoPathValidationError(error_code="forbidden-path", message="forbidden path")
 
     PathValidator.register_pre_resolution_policy(reject_forbidden)
     with pytest.raises(SplurgeSafeIoPathValidationError):
@@ -57,7 +51,7 @@ def test_reader_decoding_error_and_preview(tmp_path):
     p.write_bytes(b"\xff\xff\xff")
 
     rdr = SafeTextFileReader(p, encoding="utf-8", strip=True)
-    with pytest.raises(SplurgeSafeIoFileDecodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         # read() attempts to decode and should raise
         rdr.read()
 
@@ -149,12 +143,12 @@ def test_writer_create_new_and_permission_and_encode_and_writelines_none(
     p = tmp_path / "out.txt"
     # create the file so CREATE_NEW fails
     p.write_text("exists")
-    with pytest.raises(SplurgeSafeIoFileAlreadyExistsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(p, file_write_mode=TextFileWriteMode.CREATE_NEW)
 
     # Permission error during open -> mapped exception (use fixture)
     permit_only_target_open(str(tmp_path / "willfail.txt"), PermissionError("nope"))
-    with pytest.raises(SplurgeSafeIoFilePermissionError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(tmp_path / "willfail.txt")
 
     # Create a writer and simulate UnicodeEncodeError on write
@@ -167,7 +161,7 @@ def test_writer_create_new_and_permission_and_encode_and_writelines_none(
         raise UnicodeEncodeError("ascii", "x", 0, 1, "reason")
 
     w._file_obj.write = raise_encode
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         w.write("some text")
 
     # writelines(None) should be a no-op and not raise
@@ -183,25 +177,23 @@ def test_writer_create_new_and_permission_and_encode_and_writelines_none(
 
 
 def test_writer_open_exception_mappings_explicit(monkeypatch, tmp_path, permit_only_target_open):
-    # UnicodeEncodeError -> SplurgeSafeIoFileEncodingError
+    # UnicodeEncodeError -> SplurgeSafeIoOSError
     def fake_open_enc(*args, **kwargs):
         raise UnicodeEncodeError("ascii", "x", 0, 1, "reason")
 
     # limit the simulated encoding error to the target path
     permit_only_target_open(str(tmp_path / "enc.txt"), UnicodeEncodeError("ascii", "x", 0, 1, "reason"))
-    from splurge_safe_io.exceptions import SplurgeSafeIoFileEncodingError
 
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         SafeTextFileWriter(tmp_path / "enc.txt")
 
-    # PermissionError -> SplurgeSafeIoFilePermissionError
+    # PermissionError -> SplurgeSafeIoOSError
     def fake_open_perm(*args, **kwargs):
         raise PermissionError("no")
 
     permit_only_target_open(str(tmp_path / "perm.txt"), PermissionError("no"))
-    from splurge_safe_io.exceptions import SplurgeSafeIoFilePermissionError
 
-    with pytest.raises(SplurgeSafeIoFilePermissionError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(tmp_path / "perm.txt")
 
 
@@ -214,9 +206,8 @@ def test_writelines_encoding_mapping(monkeypatch, tmp_path):
         raise UnicodeEncodeError("ascii", "x", 0, 1, "reason")
 
     w._file_obj.write = raise_enc
-    from splurge_safe_io.exceptions import SplurgeSafeIoFileEncodingError
 
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         w.writelines(["a"])
 
 

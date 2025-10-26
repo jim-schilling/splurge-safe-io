@@ -26,7 +26,7 @@ def test_writelines_and_context_manager(tmp_path):
 def test_create_new_mode_raises_if_exists(tmp_path):
     p = tmp_path / "exists.txt"
     p.write_text("x")
-    from splurge_safe_io.exceptions import SplurgeSafeIoFileAlreadyExistsError
+    from splurge_safe_io.exceptions import SplurgeSafeIoOSError
 
-    with pytest.raises(SplurgeSafeIoFileAlreadyExistsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(p, file_write_mode=TextFileWriteMode.CREATE_NEW)

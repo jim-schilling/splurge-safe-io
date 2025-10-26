@@ -4,13 +4,7 @@ import pathlib
 
 import pytest
 
-from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileAlreadyExistsError,
-    SplurgeSafeIoFileEncodingError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
-    SplurgeSafeIoUnknownError,
-)
+from splurge_safe_io.exceptions import SplurgeSafeIoError, SplurgeSafeIoOSError, SplurgeSafeIoValueError
 from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter, TextFileWriteMode, open_safe_text_writer
 
 pytestmark = [pytest.mark.integration]
@@ -47,7 +41,7 @@ def test_open_file_exists_raises(tmp_path, permit_only_target_open):
     # Use test fixture to simulate open() raising FileExistsError only for target
     permit_only_target_open(str(target), FileExistsError("exists"))
 
-    with pytest.raises(SplurgeSafeIoFileAlreadyExistsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(target, file_write_mode=TextFileWriteMode.CREATE_NEW)
 
 
@@ -56,7 +50,7 @@ def test_open_permission_error_maps(tmp_path, permit_only_target_open):
     target = tmp_path / "perm.txt"
     permit_only_target_open(str(target), PermissionError("nope"))
 
-    with pytest.raises(SplurgeSafeIoFilePermissionError):
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileWriter(target)
 
 
@@ -65,7 +59,7 @@ def test_open_unicode_encode_error_maps(tmp_path, permit_only_target_open):
     target = tmp_path / "enc.txt"
     permit_only_target_open(str(target), UnicodeEncodeError("utf-8", "", 0, 1, "reason"))
 
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         SafeTextFileWriter(target)
 
 
@@ -89,7 +83,7 @@ def test_write_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoFileEncodingError):
+    with pytest.raises(SplurgeSafeIoValueError):
         w.write("abc")
 
     # Case: IOError (aliasing to OSError on modern Python) -> OsError
@@ -107,10 +101,10 @@ def test_write_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoOsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         w.write("abc")
 
-    # Case: OSError -> map to SplurgeSafeIoOsError (canonical mapping)
+    # Case: OSError -> map to SplurgeSafeIoOSError (canonical mapping)
     f = FakeFile(raise_on_write=OSError("oserr"))
     real_open = builtins.open
 
@@ -125,10 +119,10 @@ def test_write_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoOsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         w.write("abc")
 
-    # Case: Generic Exception -> SplurgeSafeIoUnknownError
+    # Case: Generic Exception -> SplurgeSafeIoError
     f = FakeFile(raise_on_write=Exception("boom"))
     real_open = builtins.open
 
@@ -143,7 +137,7 @@ def test_write_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoUnknownError):
+    with pytest.raises(SplurgeSafeIoError):
         w.write("abc")
 
 
@@ -165,10 +159,10 @@ def test_flush_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory2)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoOsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         w.flush()
 
-    # Case: OSError -> map to SplurgeSafeIoOsError (canonical mapping)
+    # Case: OSError -> map to SplurgeSafeIoOSError (canonical mapping)
     f = FakeFile(raise_on_flush=OSError("oserr"))
     real_open = builtins.open
 
@@ -183,7 +177,7 @@ def test_flush_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory3)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoOsError):
+    with pytest.raises(SplurgeSafeIoOSError):
         w.flush()
 
     # Case: Generic Exception
@@ -201,7 +195,7 @@ def test_flush_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory4)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoUnknownError):
+    with pytest.raises(SplurgeSafeIoError):
         w.flush()
 
 

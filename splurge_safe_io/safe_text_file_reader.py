@@ -41,12 +41,10 @@ from splurge_safe_io.constants import (
     MIN_CHUNK_SIZE,
 )
 from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileDecodingError,
-    SplurgeSafeIoFileNotFoundError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
-    SplurgeSafeIoParameterError,
-    SplurgeSafeIoUnknownError,
+    SplurgeSafeIoLookupError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoRuntimeError,
+    SplurgeSafeIoValueError,
 )
 from splurge_safe_io.path_validator import PathValidator
 
@@ -114,8 +112,8 @@ class SafeTextFileReader:
             r = SafeTextFileReader('small.txt', buffer_size=16384, chunk_size=50)
 
     Raises:
-        SplurgeSafeIoFileNotFoundError: If the file does not exist.
-        SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoOSError: If the file does not exist.
+        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
         SplurgeSafeIoPathValidationError: If the provided path fails validation checks.
     """
 
@@ -190,12 +188,12 @@ class SafeTextFileReader:
             Decoded text (str).
 
         Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoFileOperationError: If an unexpected I/O error occurs.
-            SplurgeSafeIoOsError: If a general OS error occurs.
-            SplurgeSafeIoUnknownError: If an unexpected error occurs.
+            SplurgeSafeIoLookupError: If decoding fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: If an unexpected I/O error occurs.
+            SplurgeSafeIoOSError: If a general OS error occurs.
+            SplurgeSafeIoRuntimeError: If an unexpected error occurs.
         """
         try:
             # Read raw bytes and decode explicitly to avoid the platform's
@@ -205,24 +203,37 @@ class SafeTextFileReader:
             return raw.decode(self.encoding)
 
         except FileNotFoundError as e:
-            raise SplurgeSafeIoFileNotFoundError(
-                f"File not found: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="file-not-found",
+                    message=f"File not found: {self.file_path}",
+                    details={"original_exception": e},
+                )
             ) from e
         except PermissionError as e:
-            raise SplurgeSafeIoFilePermissionError(
-                f"Permission denied reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="permission-denied", message=f"Permission denied reading file: {self.file_path}"
+                )
             ) from e
         except UnicodeError as e:
-            raise SplurgeSafeIoFileDecodingError(
-                f"Encoding error reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoLookupError(
+                    error_code="encoding",
+                    message=f"Encoding error reading file: {self.file_path} : {str(e)}",
+                )
             ) from e
         except OSError as e:
-            raise SplurgeSafeIoOsError(
-                f"OS error reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="general", message=f"General OS error reading file: {self.file_path} : {str(e)}"
+                )
             ) from e
         except Exception as e:
-            raise SplurgeSafeIoUnknownError(
-                f"Unexpected error reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoRuntimeError(
+                    error_code="general", message=f"General error reading file: {self.file_path} : {str(e)}"
+                )
             ) from e
 
     def read(self) -> str:
@@ -234,11 +245,11 @@ class SafeTextFileReader:
             str: Normalized file content.
 
         Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If decoding fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For other unexpected errors.
 
         Note: This method is equivalent to calling `readlines()` and joining the lines with `\n`.
         """
@@ -254,11 +265,11 @@ class SafeTextFileReader:
             list[str]: Normalized lines from the file.
 
         Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If decoding fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For other unexpected errors.
         """
         text = self._read()
 
@@ -300,13 +311,20 @@ class SafeTextFileReader:
             list has length <= ``chunk_size``.
 
         Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If decoder initialization fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For other unexpected errors.
         """
-        decoder = codecs.getincrementaldecoder(self.encoding)()
+        try:
+            decoder = codecs.getincrementaldecoder(self.encoding)()
+        except Exception as exc:
+            raise SplurgeSafeIoLookupError(
+                error_code="decoder-initialization",
+                message=f"Error initializing decoder, {self.encoding}, for file: {self.file_path} : {str(exc)}",
+            ) from exc
+
         footer_buf: deque[str] = deque(maxlen=self.skip_footer_lines or 0)
         header_to_skip = self.skip_header_lines
         effective_chunk_size = self.chunk_size
@@ -452,20 +470,26 @@ class SafeTextFileReader:
                 yield lines[i : i + effective_chunk_size]
 
         except FileNotFoundError as e:
-            raise SplurgeSafeIoFileNotFoundError(
-                f"File not found: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(error_code="file-not-found", message=f"File not found: {self.file_path}")
             ) from e
         except PermissionError as e:
-            raise SplurgeSafeIoFilePermissionError(
-                f"Permission denied reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="permission-denied", message=f"Permission denied reading file: {self.file_path}"
+                )
             ) from e
         except OSError as e:
-            raise SplurgeSafeIoOsError(
-                f"OS error reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoOSError(
+                    error_code="general", message=f"General OS error reading file: {self.file_path} : {str(e)}"
+                )
             ) from e
         except Exception as e:
-            raise SplurgeSafeIoUnknownError(
-                f"Unexpected error reading file: {self.file_path}", details=str(e), original_exception=e
+            raise (
+                SplurgeSafeIoRuntimeError(
+                    error_code="general", message=f"General error reading file: {self.file_path} : {str(e)}"
+                )
             ) from e
 
     def preview(self, max_lines: int = DEFAULT_PREVIEW_LINES) -> list[str]:
@@ -478,11 +502,11 @@ class SafeTextFileReader:
             list[str]: The first ``max_lines`` normalized lines.
 
         Raises:
-            SplurgeSafeIoFileDecodingError: If decoding fails.
-            SplurgeSafeIoFileNotFoundError: If the file does not exist.
-            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOsError: For unexpected OS-level errors.
-            SplurgeSafeIoUnknownError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If decoder initialization fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For other unexpected errors.
         """
         # Avoid reading the entire file where possible by using the
         # streaming reader and stopping as soon as we have enough lines.
@@ -550,13 +574,22 @@ class SafeTextFileReader:
         Returns:
             int: Number of logical lines in the file.
 
-        Raises: same exceptions as :meth:`_read` and :meth:`readlines_as_stream`
-        (mapped to the package exception types).
+        Raises:
+            SplurgeSafeIoValueError: If `threshold_bytes` is too small.
+            SplurgeSafeIoLookupError: If decoder initialization fails.
+            SplurgeSafeIoLookupError: If decoding fails.
+            SplurgeSafeIoOSError: If the file does not exist.
+            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For unexpected OS-level errors.
+            SplurgeSafeIoRuntimeError: For other unexpected errors.
         """
         # Validate threshold is reasonable (prevent accidental tiny thresholds)
         min_threshold = 1 * 1024 * 1024  # 1 MiB
         if int(threshold_bytes) < min_threshold:
-            raise SplurgeSafeIoParameterError(f"threshold_bytes must be >= {min_threshold} (1 MiB)")
+            raise SplurgeSafeIoValueError(
+                error_code="invalid-value",
+                message=f"threshold_bytes {threshold_bytes} is too small.",
+            ).add_suggestion("Provide a larger threshold_bytes value or omit it to use the default.")
 
         # Determine file size; fall back to streaming if unavailable.
         try:
@@ -638,11 +671,11 @@ def open_safe_text_reader(
         io.StringIO: In-memory text buffer with normalized newlines.
 
     Raises:
-        SplurgeSafeIoFileDecodingError: If decoding fails.
-        SplurgeSafeIoFileNotFoundError: If the file does not exist.
-        SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
-        SplurgeSafeIoOsError: For unexpected OS-level errors.
-        SplurgeSafeIoUnknownError: For other unexpected errors.
+        SplurgeSafeIoLookupError: If decoding fails.
+        SplurgeSafeIoOSError: If the file does not exist.
+        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoOSError: For unexpected OS-level errors.
+        SplurgeSafeIoRuntimeError: For other unexpected errors.
     """
     safe_reader = SafeTextFileReader(
         file_path,
@@ -658,3 +691,80 @@ def open_safe_text_reader(
         yield sio
     finally:
         sio.close()
+
+
+@contextmanager
+def open_safe_text_reader_as_stream(
+    file_path: Path | str,
+    *,
+    encoding: str = DEFAULT_ENCODING,
+    strip: bool = False,
+    skip_header_lines: int = 0,
+    skip_footer_lines: int = 0,
+) -> Iterator[Iterator[list[str]]]:
+    """Context manager yielding a memory-efficient streaming reader for large files.
+
+    Unlike :func:`open_safe_text_reader`, this function streams file content
+    in chunks rather than loading the entire file into memory. This makes it
+    suitable for processing extremely large files (multi-gigabyte+) with
+    constant memory usage.
+
+    The yielded iterator produces lists of normalized lines. Each list
+    contains a chunk of lines (size determined by the streaming implementation).
+    Iterate through the chunks to process the file progressively.
+
+    Args:
+        file_path (str | pathlib.Path): Path to the file to open.
+        encoding (str): Encoding to decode the file with. Defaults to UTF-8.
+        strip (bool): Whether to strip leading/trailing whitespace from each line.
+            Defaults to False.
+        skip_header_lines (int): Number of lines to skip from the beginning.
+            Defaults to 0.
+        skip_footer_lines (int): Number of lines to skip from the end.
+            Defaults to 0.
+
+    Yields:
+        Iterator[list[str]]: An iterator that yields lists of normalized line
+        strings. Each yielded list contains a chunk of lines from the file.
+
+    Example:
+        Process a large file without loading it all into memory::
+
+            with open_safe_text_reader_as_stream("huge_file.txt") as line_chunks:
+                for chunk in line_chunks:
+                    for line in chunk:
+                        process_line(line)
+
+        With header/footer skipping::
+
+            with open_safe_text_reader_as_stream(
+                "data.csv",
+                skip_header_lines=1,  # Skip CSV header
+                skip_footer_lines=1,  # Skip final summary line
+            ) as line_chunks:
+                for chunk in line_chunks:
+                    process_chunk(chunk)
+
+    Raises:
+        SplurgeSafeIoLookupError: If decoder initialization fails or decoding fails.
+        SplurgeSafeIoOSError: If the file does not exist.
+        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoOSError: For unexpected OS-level errors.
+        SplurgeSafeIoRuntimeError: For other unexpected errors.
+
+    Note:
+        This streaming approach uses constant memory regardless of file size,
+        making it ideal for processing large files. Use :func:`open_safe_text_reader`
+        only when you need the entire file as a single StringIO object.
+    """
+    safe_reader = SafeTextFileReader(
+        file_path,
+        encoding=encoding,
+        strip=strip,
+        skip_header_lines=skip_header_lines,
+        skip_footer_lines=skip_footer_lines,
+    )
+    try:
+        yield safe_reader.readlines_as_stream()
+    finally:
+        pass  # SafeTextFileReader handles cleanup

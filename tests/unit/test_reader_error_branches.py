@@ -4,10 +4,8 @@ from pathlib import Path
 import pytest
 
 from splurge_safe_io.exceptions import (
-    SplurgeSafeIoFileDecodingError,
-    SplurgeSafeIoFileNotFoundError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
+    SplurgeSafeIoLookupError,
+    SplurgeSafeIoOSError,
 )
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 
@@ -33,14 +31,14 @@ def test__read_unicode_decode_error_maps(tmp_path, monkeypatch):
 
     monkeypatch.setattr(Path, "open", fake_path_open)
 
-    with pytest.raises(SplurgeSafeIoFileDecodingError):
+    with pytest.raises(SplurgeSafeIoLookupError):
         SafeTextFileReader(p, encoding="utf-8").read()
 
 
 def test__read_file_not_found_and_permission(monkeypatch):
     p = Path("/nonexistent/path.txt")
-    # When path does not exist, PathValidator should raise SplurgeSafeIoFileNotFoundError
-    with pytest.raises(SplurgeSafeIoFileNotFoundError):
+    # When path does not exist, PathValidator should raise SplurgeSafeIoOSError
+    with pytest.raises(SplurgeSafeIoOSError):
         SafeTextFileReader(p)
 
     # For permission error mapping, create a real file then patch Path.open
@@ -55,7 +53,7 @@ def test__read_file_not_found_and_permission(monkeypatch):
             return original_open(self, mode, *a, **k)
 
         monkeypatch.setattr(Path, "open", fake_open_perm)
-        with pytest.raises(SplurgeSafeIoFilePermissionError):
+        with pytest.raises(SplurgeSafeIoOSError):
             SafeTextFileReader(tmp).read()
     finally:
         try:
@@ -77,7 +75,7 @@ def test__read_os_and_io_error_maps(monkeypatch):
             return original_open(self, mode, *a, **k)
 
         monkeypatch.setattr(Path, "open", fake_open_os)
-        with pytest.raises(SplurgeSafeIoOsError):
+        with pytest.raises(SplurgeSafeIoOSError):
             SafeTextFileReader(real).read()
 
         def fake_open_io(self, mode="rb", *a, **k):
@@ -86,8 +84,8 @@ def test__read_os_and_io_error_maps(monkeypatch):
             return original_open(self, mode, *a, **k)
 
         monkeypatch.setattr(Path, "open", fake_open_io)
-        # IOError is an alias of OSError on modern Python; we map both to SplurgeSafeIoOsError
-        with pytest.raises(SplurgeSafeIoOsError):
+        # IOError is an alias of OSError on modern Python; we map both to SplurgeSafeIoOSError
+        with pytest.raises(SplurgeSafeIoOSError):
             SafeTextFileReader(real).read()
     finally:
         try:

@@ -3,7 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from splurge_safe_io.exceptions import SplurgeSafeIoParameterError
+from splurge_safe_io.exceptions import (
+    SplurgeSafeIoValueError,
+)
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
 
 
@@ -478,7 +480,7 @@ def test_line_count_rejects_small_threshold(tmp_path):
     p = tmp_path / "t.txt"
     p.write_text("1\n2\n3")
     r = SafeTextFileReader(p)
-    with pytest.raises(SplurgeSafeIoParameterError):
+    with pytest.raises(SplurgeSafeIoValueError):
         r.line_count(threshold_bytes=512 * 1024)
 
 
