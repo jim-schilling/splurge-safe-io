@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "splurge-safe-io"
-version = "2025.2.0"
+version = "2025.2.1"
 description = "A safe, atomic, and cross-platform way to handle text file I/O in Python."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,7 +25,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "splurge-exceptions>=2025.0.1",
+    "splurge-exceptions>=2025.1.0,<2025.2.0",
 ]
 
 [project.optional-dependencies]

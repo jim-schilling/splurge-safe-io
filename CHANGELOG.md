@@ -1,5 +1,11 @@
 ## Changelog
 
+### [2025.2.1] - 2025-10-26
+
+#### Changed
+- Bump package version to `2025.2.1` in `pyproject.toml` and expose `__version__ = "2025.2.1"` in `splurge_safe_io/__init__.py`.
+- Updated development dependencies in `pyproject.toml` to latest compatible versions.
+
 ### [2025.2.0] - 2025-10-25
 
 #### Removed
