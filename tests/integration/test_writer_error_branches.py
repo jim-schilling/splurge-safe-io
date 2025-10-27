@@ -4,7 +4,13 @@ import pathlib
 
 import pytest
 
-from splurge_safe_io.exceptions import SplurgeSafeIoError, SplurgeSafeIoOSError, SplurgeSafeIoValueError
+from splurge_safe_io.exceptions import (
+    SplurgeSafeIoError,
+    SplurgeSafeIoFileExistsError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoPermissionError,
+    SplurgeSafeIoUnicodeError,
+)
 from splurge_safe_io.safe_text_file_writer import SafeTextFileWriter, TextFileWriteMode, open_safe_text_writer
 
 pytestmark = [pytest.mark.integration]
@@ -41,7 +47,7 @@ def test_open_file_exists_raises(tmp_path, permit_only_target_open):
     # Use test fixture to simulate open() raising FileExistsError only for target
     permit_only_target_open(str(target), FileExistsError("exists"))
 
-    with pytest.raises(SplurgeSafeIoOSError):
+    with pytest.raises(SplurgeSafeIoFileExistsError):
         SafeTextFileWriter(target, file_write_mode=TextFileWriteMode.CREATE_NEW)
 
 
@@ -50,7 +56,7 @@ def test_open_permission_error_maps(tmp_path, permit_only_target_open):
     target = tmp_path / "perm.txt"
     permit_only_target_open(str(target), PermissionError("nope"))
 
-    with pytest.raises(SplurgeSafeIoOSError):
+    with pytest.raises(SplurgeSafeIoPermissionError):
         SafeTextFileWriter(target)
 
 
@@ -59,7 +65,7 @@ def test_open_unicode_encode_error_maps(tmp_path, permit_only_target_open):
     target = tmp_path / "enc.txt"
     permit_only_target_open(str(target), UnicodeEncodeError("utf-8", "", 0, 1, "reason"))
 
-    with pytest.raises(SplurgeSafeIoValueError):
+    with pytest.raises(SplurgeSafeIoUnicodeError):
         SafeTextFileWriter(target)
 
 
@@ -83,7 +89,7 @@ def test_write_raises_mapped_exceptions(tmp_path, monkeypatch):
 
     monkeypatch.setattr(builtins, "open", open_factory)
     w = SafeTextFileWriter(target)
-    with pytest.raises(SplurgeSafeIoValueError):
+    with pytest.raises(SplurgeSafeIoUnicodeError):
         w.write("abc")
 
     # Case: IOError (aliasing to OSError on modern Python) -> OsError

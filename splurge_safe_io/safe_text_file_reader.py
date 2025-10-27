@@ -41,9 +41,12 @@ from splurge_safe_io.constants import (
     MIN_CHUNK_SIZE,
 )
 from splurge_safe_io.exceptions import (
+    SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoLookupError,
     SplurgeSafeIoOSError,
+    SplurgeSafeIoPermissionError,
     SplurgeSafeIoRuntimeError,
+    SplurgeSafeIoUnicodeError,
     SplurgeSafeIoValueError,
 )
 from splurge_safe_io.path_validator import PathValidator
@@ -93,27 +96,28 @@ class SafeTextFileReader:
 
         Typical usage and tuning guidance::
 
-            # Default: sensible for many files (buffer_size=32768, chunk_size=500)
+            /* Default: sensible for many files (buffer_size=32768, chunk_size=500) */
             r = SafeTextFileReader('large.txt')
 
-            # Low-latency consumer: smaller logical chunks but default byte buffer
+            /* Low-latency consumer: smaller logical chunks but default byte buffer */
             r = SafeTextFileReader('large.txt', chunk_size=10)
             for chunk in r.readlines_as_stream():
                 process(chunk)
 
-            # High-throughput: larger byte buffer to reduce syscalls and large chunks
+            /* High-throughput: larger byte buffer to reduce syscalls and large chunks */
             r = SafeTextFileReader('large.txt', buffer_size=65536, chunk_size=2000)
             for chunk in r.readlines_as_stream():
                 bulk_process(chunk)
 
-            # Small files or memory constrained: reduce buffer_size (MIN_BUFFER_SIZE enforced)
-            # Note: MIN_BUFFER_SIZE currently equals 16384 bytes, so smaller
-            # requests will be rounded up.
+            /* Small files or memory constrained: reduce buffer_size (MIN_BUFFER_SIZE enforced)
+             * Note: MIN_BUFFER_SIZE currently equals 16384 bytes, so smaller
+             * requests will be rounded up.
+             */
             r = SafeTextFileReader('small.txt', buffer_size=16384, chunk_size=50)
 
     Raises:
-        SplurgeSafeIoOSError: If the file does not exist.
-        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoFileNotFoundError: If the file does not exist.
+        SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
         SplurgeSafeIoPathValidationError: If the provided path fails validation checks.
     """
 
@@ -188,12 +192,12 @@ class SafeTextFileReader:
             Decoded text (str).
 
         Raises:
-            SplurgeSafeIoLookupError: If decoding fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: If an unexpected I/O error occurs.
-            SplurgeSafeIoOSError: If a general OS error occurs.
-            SplurgeSafeIoRuntimeError: If an unexpected error occurs.
+            SplurgeSafeIoLookupError: If codecs initializer fails or codecs not found.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: If other general OS error occurs.
+            SplurgeSafeIoRuntimeError: If other general runtime error occurs.
         """
         try:
             # Read raw bytes and decode explicitly to avoid the platform's
@@ -204,7 +208,7 @@ class SafeTextFileReader:
 
         except FileNotFoundError as e:
             raise (
-                SplurgeSafeIoOSError(
+                SplurgeSafeIoFileNotFoundError(
                     error_code="file-not-found",
                     message=f"File not found: {self.file_path}",
                     details={"original_exception": e},
@@ -212,15 +216,20 @@ class SafeTextFileReader:
             ) from e
         except PermissionError as e:
             raise (
-                SplurgeSafeIoOSError(
+                SplurgeSafeIoPermissionError(
                     error_code="permission-denied", message=f"Permission denied reading file: {self.file_path}"
                 )
             ) from e
+        except LookupError as e:
+            raise SplurgeSafeIoLookupError(
+                error_code="codecs-initialization",
+                message=f"Error initializing codecs decoder, {self.encoding}, for file: {self.file_path} : {str(e)}",
+            ) from e
         except UnicodeError as e:
             raise (
-                SplurgeSafeIoLookupError(
-                    error_code="encoding",
-                    message=f"Encoding error reading file: {self.file_path} : {str(e)}",
+                SplurgeSafeIoUnicodeError(
+                    error_code="decoding",
+                    message=f"Decoding error reading file: {self.file_path} : {str(e)}",
                 )
             ) from e
         except OSError as e:
@@ -232,7 +241,7 @@ class SafeTextFileReader:
         except Exception as e:
             raise (
                 SplurgeSafeIoRuntimeError(
-                    error_code="general", message=f"General error reading file: {self.file_path} : {str(e)}"
+                    error_code="general", message=f"General runtime error reading file: {self.file_path} : {str(e)}"
                 )
             ) from e
 
@@ -245,11 +254,12 @@ class SafeTextFileReader:
             str: Normalized file content.
 
         Raises:
-            SplurgeSafeIoLookupError: If decoding fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: For unexpected OS-level errors.
-            SplurgeSafeIoRuntimeError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If codecs initializer fails or codecs not found.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For other general OS-level errors.
+            SplurgeSafeIoRuntimeError: For other general runtime errors.
 
         Note: This method is equivalent to calling `readlines()` and joining the lines with `\n`.
         """
@@ -265,11 +275,12 @@ class SafeTextFileReader:
             list[str]: Normalized lines from the file.
 
         Raises:
-            SplurgeSafeIoLookupError: If decoding fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: For unexpected OS-level errors.
-            SplurgeSafeIoRuntimeError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If codecs initializer fails or codecs not found.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For other general OS-level errors.
+            SplurgeSafeIoRuntimeError: For other general runtime errors.
         """
         text = self._read()
 
@@ -311,18 +322,19 @@ class SafeTextFileReader:
             list has length <= ``chunk_size``.
 
         Raises:
-            SplurgeSafeIoLookupError: If decoder initialization fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: For unexpected OS-level errors.
-            SplurgeSafeIoRuntimeError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If codecs initializer fails or codecs not found.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoOSError: For other general OS-level errors.
+            SplurgeSafeIoRuntimeError: For other general runtime errors.
         """
         try:
             decoder = codecs.getincrementaldecoder(self.encoding)()
         except Exception as exc:
             raise SplurgeSafeIoLookupError(
-                error_code="decoder-initialization",
-                message=f"Error initializing decoder, {self.encoding}, for file: {self.file_path} : {str(exc)}",
+                error_code="codecs-initialization",
+                message=f"Error initializing codecs decoder, {self.encoding}, for file: {self.file_path} : {str(exc)}",
             ) from exc
 
         footer_buf: deque[str] = deque(maxlen=self.skip_footer_lines or 0)
@@ -471,11 +483,11 @@ class SafeTextFileReader:
 
         except FileNotFoundError as e:
             raise (
-                SplurgeSafeIoOSError(error_code="file-not-found", message=f"File not found: {self.file_path}")
+                SplurgeSafeIoFileNotFoundError(error_code="file-not-found", message=f"File not found: {self.file_path}")
             ) from e
         except PermissionError as e:
             raise (
-                SplurgeSafeIoOSError(
+                SplurgeSafeIoPermissionError(
                     error_code="permission-denied", message=f"Permission denied reading file: {self.file_path}"
                 )
             ) from e
@@ -488,7 +500,7 @@ class SafeTextFileReader:
         except Exception as e:
             raise (
                 SplurgeSafeIoRuntimeError(
-                    error_code="general", message=f"General error reading file: {self.file_path} : {str(e)}"
+                    error_code="general", message=f"General runtime error reading file: {self.file_path} : {str(e)}"
                 )
             ) from e
 
@@ -502,11 +514,13 @@ class SafeTextFileReader:
             list[str]: The first ``max_lines`` normalized lines.
 
         Raises:
-            SplurgeSafeIoLookupError: If decoder initialization fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: For unexpected OS-level errors.
-            SplurgeSafeIoRuntimeError: For other unexpected errors.
+            SplurgeSafeIoPathValidationError: if the file path is invalid.
+            SplurgeSafeIoLookupError: If codecs initialization fails or codecs not found.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoOSError: For other general OS-level errors.
+            SplurgeSafeIoRuntimeError: For other general runtime errors.
         """
         # Avoid reading the entire file where possible by using the
         # streaming reader and stopping as soon as we have enough lines.
@@ -576,12 +590,12 @@ class SafeTextFileReader:
 
         Raises:
             SplurgeSafeIoValueError: If `threshold_bytes` is too small.
-            SplurgeSafeIoLookupError: If decoder initialization fails.
-            SplurgeSafeIoLookupError: If decoding fails.
-            SplurgeSafeIoOSError: If the file does not exist.
-            SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-            SplurgeSafeIoOSError: For unexpected OS-level errors.
-            SplurgeSafeIoRuntimeError: For other unexpected errors.
+            SplurgeSafeIoLookupError: If codecs initialization fails or codecs not found.
+            SplurgeSafeIoFileNotFoundError: If the file does not exist.
+            SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+            SplurgeSafeIoUnicodeError: If decoding fails.
+            SplurgeSafeIoOSError: For other general OS-level errors.
+            SplurgeSafeIoRuntimeError: For other general runtime errors.
         """
         # Validate threshold is reasonable (prevent accidental tiny thresholds)
         min_threshold = 1 * 1024 * 1024  # 1 MiB
@@ -671,11 +685,13 @@ def open_safe_text_reader(
         io.StringIO: In-memory text buffer with normalized newlines.
 
     Raises:
-        SplurgeSafeIoLookupError: If decoding fails.
-        SplurgeSafeIoOSError: If the file does not exist.
-        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-        SplurgeSafeIoOSError: For unexpected OS-level errors.
-        SplurgeSafeIoRuntimeError: For other unexpected errors.
+        SplurgeSafeIoPathValidationError: if the file path is invalid.
+        SplurgeSafeIoLookupError: If codecs initialization fails or codecs not found.
+        SplurgeSafeIoFileNotFoundError: If the file does not exist.
+        SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoUnicodeError: If decoding fails.
+        SplurgeSafeIoOSError: For other general OS-level errors.
+        SplurgeSafeIoRuntimeError: For other general runtime errors.
     """
     safe_reader = SafeTextFileReader(
         file_path,
@@ -746,11 +762,13 @@ def open_safe_text_reader_as_stream(
                     process_chunk(chunk)
 
     Raises:
-        SplurgeSafeIoLookupError: If decoder initialization fails or decoding fails.
-        SplurgeSafeIoOSError: If the file does not exist.
-        SplurgeSafeIoOSError: If the file cannot be read due to permission issues.
-        SplurgeSafeIoOSError: For unexpected OS-level errors.
-        SplurgeSafeIoRuntimeError: For other unexpected errors.
+        SplurgeSafeIoPathValidationError: if the file path is invalid.
+        SplurgeSafeIoLookupError: If codecs initialization fails or codecs not found.
+        SplurgeSafeIoFileNotFoundError: If the file does not exist.
+        SplurgeSafeIoFilePermissionError: If the file cannot be read due to permission issues.
+        SplurgeSafeIoUnicodeError: If decoding fails.
+        SplurgeSafeIoOSError: For other general OS-level errors.
+        SplurgeSafeIoRuntimeError: For other general runtime errors.
 
     Note:
         This streaming approach uses constant memory regardless of file size,

@@ -1,5 +1,15 @@
 ## Changelog
 
+### [2025.3.0] - 2025-10-27
+
+#### Refactored/Fixed
+- Refactored exception mapping in `SafeTextFileReader` and `SafeTextFileWriter` to ensure that all relevant built-in exceptions (including `OSError`, `PermissionError`, and `UnicodeError`) are correctly mapped to their corresponding `SplurgeSafeIo*` exceptions from the `splurge-exceptions` package.
+- Updated unit and integration tests to cover the newly mapped exceptions, ensuring that all error branches are properly tested and validated.
+
+#### Changed
+- Bumped package version to `2025.3.0` in `pyproject.toml` and exposed `__version__ = "2025.3.0"` in `splurge_safe_io/__init__.py`.
+- Updated development dependencies in `pyproject.toml` to latest compatible versions.
+
 ### [2025.2.1] - 2025-10-26
 
 #### Changed

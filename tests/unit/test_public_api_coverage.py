@@ -15,9 +15,13 @@ from splurge_safe_io import (
     PathValidator,
     SafeTextFileReader,
     SafeTextFileWriter,
+    SplurgeSafeIoFileExistsError,
+    SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoLookupError,
     SplurgeSafeIoOSError,
     SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoPermissionError,
+    SplurgeSafeIoUnicodeError,
     SplurgeSafeIoValueError,
     TextFileWriteMode,
     open_safe_text_reader,
@@ -111,7 +115,7 @@ class TestOpenSafeTextReaderContextManager:
         """Verify StringIO buffer is closed even if exception occurs reading."""
         p = tmp_path / "nonexistent.txt"
 
-        with pytest.raises(SplurgeSafeIoOSError):
+        with pytest.raises(SplurgeSafeIoFileNotFoundError):
             with open_safe_text_reader(p):
                 pass
 
@@ -121,7 +125,7 @@ class TestOpenSafeTextReaderContextManager:
         """Test that missing file raises appropriate exception."""
         p = tmp_path / "nonexistent.txt"
 
-        with pytest.raises(SplurgeSafeIoOSError):
+        with pytest.raises(SplurgeSafeIoFileNotFoundError):
             with open_safe_text_reader(p):
                 pass
 
@@ -156,7 +160,7 @@ class TestOpenSafeTextWriterContextManager:
         p = tmp_path / "output.txt"
         p.write_text("existing")
 
-        with pytest.raises(SplurgeSafeIoOSError):
+        with pytest.raises(SplurgeSafeIoFileExistsError):
             with open_safe_text_writer(p, file_write_mode=TextFileWriteMode.CREATE_NEW) as buf:
                 buf.write("new content")
 
@@ -253,14 +257,14 @@ class TestPathValidatorAdvanced:
         """Test must_be_readable=True raises for non-existent file."""
         p = tmp_path / "nonexistent.txt"
 
-        with pytest.raises(SplurgeSafeIoOSError):
+        with pytest.raises(SplurgeSafeIoFileNotFoundError):
             PathValidator.get_validated_path(p, must_exist=False, must_be_readable=True)
 
     def test_path_validator_must_be_writable(self, tmp_path):
         """Test must_be_writable=True raises for non-existent file."""
         p = tmp_path / "nonexistent.txt"
 
-        with pytest.raises(SplurgeSafeIoOSError):
+        with pytest.raises(SplurgeSafeIoFileNotFoundError):
             PathValidator.get_validated_path(p, must_exist=False, must_be_writable=True)
 
     def test_path_validator_must_be_file_with_directory(self, tmp_path):
@@ -372,7 +376,7 @@ class TestSafeTextFileReaderEdgeCases:
         p.write_bytes(b"valid\xff\xfeinvalid")
 
         reader = SafeTextFileReader(p, encoding="utf-8")
-        with pytest.raises(SplurgeSafeIoLookupError):
+        with pytest.raises(SplurgeSafeIoUnicodeError):
             reader.readlines()
 
     def test_reader_readlines_as_stream_with_chunks(self, tmp_path):
@@ -467,3 +471,29 @@ class TestExceptionAttributes:
         """Test SplurgeSafeIoLookupError is properly defined."""
         exc = SplurgeSafeIoLookupError(error_code="encoding-failed", message="Could not decode with encoding")
         assert exc.error_code == "encoding-failed"
+
+    def test_file_not_found_error_has_error_code(self):
+        """Test SplurgeSafeIoFileNotFoundError has error_code attribute."""
+        exc = SplurgeSafeIoFileNotFoundError(error_code="file-not-found", message="File not found")
+        assert exc.error_code == "file-not-found"
+        assert issubclass(SplurgeSafeIoFileNotFoundError, SplurgeSafeIoOSError)
+
+    def test_permission_error_has_error_code(self):
+        """Test SplurgeSafeIoPermissionError has error_code attribute."""
+        exc = SplurgeSafeIoPermissionError(error_code="permission-denied", message="Permission denied")
+        assert exc.error_code == "permission-denied"
+        assert issubclass(SplurgeSafeIoPermissionError, SplurgeSafeIoOSError)
+
+    def test_file_exists_error_has_error_code(self):
+        """Test SplurgeSafeIoFileExistsError has error_code attribute."""
+        exc = SplurgeSafeIoFileExistsError(error_code="file-exists", message="File exists")
+        assert exc.error_code == "file-exists"
+        assert issubclass(SplurgeSafeIoFileExistsError, SplurgeSafeIoOSError)
+
+    def test_unicode_error_has_error_code(self):
+        """Test SplurgeSafeIoUnicodeError has error_code attribute."""
+        from splurge_safe_io import SplurgeSafeIoUnicodeError
+
+        exc = SplurgeSafeIoUnicodeError(error_code="decoding", message="Unicode decode error")
+        assert exc.error_code == "decoding"
+        assert issubclass(SplurgeSafeIoUnicodeError, SplurgeSafeIoValueError)

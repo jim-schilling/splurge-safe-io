@@ -20,8 +20,8 @@ from pathlib import Path
 from splurge_safe_io.exceptions import (
     SplurgeSafeIoError,
     SplurgeSafeIoFileNotFoundError,
-    SplurgeSafeIoFilePermissionError,
-    SplurgeSafeIoOsError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoPermissionError,
 )
 from splurge_safe_io.path_validator import PathValidator
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
@@ -96,12 +96,12 @@ def demo_error_inspection(tmp_dir: Path) -> None:
         # Open a directory path as a file to force a permission-like error
         bad_path = tmp_dir
         SafeTextFileWriter(bad_path, encoding="utf-8")
-    except SplurgeSafeIoFilePermissionError as err:
-        print("Caught mapped PermissionError -> SplurgeSafeIoFilePermissionError")
+    except SplurgeSafeIoPermissionError as err:
+        print("Caught mapped PermissionError -> SplurgeSafeIoPermissionError")
         print("original_exception:", repr(getattr(err, "original_exception", None)))
-    except SplurgeSafeIoOsError as err:
+    except SplurgeSafeIoOSError as err:
         # Fallback: any other OS-level mapped error
-        print("Caught other mapped OSError -> SplurgeSafeIoOsError")
+        print("Caught other mapped OSError -> SplurgeSafeIoOSError")
         print("original_exception:", repr(getattr(err, "original_exception", None)))
 
 

@@ -85,13 +85,52 @@ class SplurgeSafeIoRuntimeError(SplurgeSafeIoError):
     _domain = "splurge-safe-io.runtime"
 
 
-class SplurgeSafeIoLookupError(SplurgeSafeIoValueError):
+class SplurgeSafeIoLookupError(SplurgeSafeIoError):
     """Raised for lookup errors in splurge-safe-io operations.
 
-    Use this exception to indicate problems with text encoding or decoding,
-    such as invalid byte sequences or unsupported encodings.
-    Use this exception to indicate lookup failures, such as missing keys
+    Use this exception to indicate codecs not found errors.
+    Use this exception to indicate lookup failures, such as missing keys.
     in dictionaries or failed searches.
     """
 
     _domain = "splurge-safe-io.lookup"
+
+
+class SplurgeSafeIoFileNotFoundError(SplurgeSafeIoOSError):
+    """Raised when a specified file or path cannot be found.
+
+    Use this exception to indicate that a required file is missing
+    or inaccessible.
+    """
+
+    _domain = "splurge-safe-io.file-not-found"
+
+
+class SplurgeSafeIoPermissionError(SplurgeSafeIoOSError):
+    """Raised when operations fail due to permission issues.
+
+    Use this exception to indicate that the current user lacks
+    necessary permissions for requested operation (e.g., reading or writing a file).
+    """
+
+    _domain = "splurge-safe-io.permission"
+
+
+class SplurgeSafeIoFileExistsError(SplurgeSafeIoOSError):
+    """Raised when attempting to create a file that already exists.
+
+    Use this exception to indicate that a file creation operation
+    failed because the target file already exists.
+    """
+
+    _domain = "splurge-safe-io.file-exists"
+
+
+class SplurgeSafeIoUnicodeError(SplurgeSafeIoValueError):
+    """Raised for Unicode encoding or decoding errors.
+
+    Use this exception to indicate problems with text encoding or decoding,
+    such as invalid byte sequences or unsupported encodings.
+    """
+
+    _domain = "splurge-safe-io.unicode"

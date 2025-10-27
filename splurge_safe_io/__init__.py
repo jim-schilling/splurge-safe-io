@@ -6,16 +6,20 @@ Expose commonly-used helpers and constants for convenience.
 
 from __future__ import annotations
 
-__version__ = "2025.2.1"
+__version__ = "2025.3.0"
 
 # Public exports (import lazily to avoid side-effects)
 from .constants import CANONICAL_NEWLINE, DEFAULT_ENCODING
 from .exceptions import (
     SplurgeSafeIoError,
+    SplurgeSafeIoFileExistsError,
+    SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoLookupError,
     SplurgeSafeIoOSError,
     SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoPermissionError,
     SplurgeSafeIoRuntimeError,
+    SplurgeSafeIoUnicodeError,
     SplurgeSafeIoValueError,
 )
 
@@ -38,11 +42,15 @@ __all__ = [
     "SplurgeSafeIoValueError",
     "SplurgeSafeIoRuntimeError",
     "SplurgeSafeIoLookupError",
-    "PathValidator",
+    "SplurgeSafeIoFileNotFoundError",
+    "SplurgeSafeIoPermissionError",
+    "SplurgeSafeIoFileExistsError",
+    "SplurgeSafeIoUnicodeError",
     "SafeTextFileReader",
     "open_safe_text_reader",
     "open_safe_text_reader_as_stream",
     "SafeTextFileWriter",
     "open_safe_text_writer",
     "TextFileWriteMode",
+    "PathValidator",
 ]
