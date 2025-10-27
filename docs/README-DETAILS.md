@@ -95,10 +95,14 @@ This guide complements the project `README.md` and the API reference (`docs/api/
 | Exception | Error Codes | Raised For |
 |-----------|-------------|-----------|
 | `SplurgeSafeIoError` | (base) | All splurge-safe-io errors |
-| `SplurgeSafeIoOSError` | "file-not-found", "permission-denied", "general" | OS-level file I/O errors |
-| `SplurgeSafeIoLookupError` | "encoding" | Text encoding/decoding errors |
+| `SplurgeSafeIoOSError` | "general" | General OS-level file I/O errors |
+| `SplurgeSafeIoFileNotFoundError` | "file-not-found" | File not found (subclass of `SplurgeSafeIoOSError`) |
+| `SplurgeSafeIoPermissionError` | "permission-denied" | Permission denied (subclass of `SplurgeSafeIoOSError`) |
+| `SplurgeSafeIoFileExistsError` | "file-exists" | File exists (subclass of `SplurgeSafeIoOSError`) |
 | `SplurgeSafeIoValueError` | (various) | Invalid parameters |
+| `SplurgeSafeIoUnicodeError` | "encoding", "decoding" | Unicode encoding/decoding errors (subclass of `SplurgeSafeIoValueError`) |
 | `SplurgeSafeIoRuntimeError` | "general" | Unexpected runtime conditions |
+| `SplurgeSafeIoLookupError` | "codecs-initialization" | Codec not found |
 | `SplurgeSafeIoPathValidationError` | "path-traversal-detected" | Path validation failures |
 
 ---
@@ -171,6 +175,48 @@ with open_safe_text_writer('clean.txt', create_parents=True) as out:
             continue
         out.write(f"PROCESSED: {line}\n")
 ```
+
+### Exception Handling
+
+The library provides a clear exception hierarchy for semantic error handling:
+
+```python
+from splurge_safe_io import (
+    SafeTextFileReader,
+    SplurgeSafeIoError,
+    SplurgeSafeIoFileNotFoundError,
+    SplurgeSafeIoPermissionError,
+    SplurgeSafeIoUnicodeError,
+    SplurgeSafeIoPathValidationError,
+)
+
+try:
+    reader = SafeTextFileReader('data.txt', encoding='utf-8')
+    lines = reader.readlines()
+except SplurgeSafeIoFileNotFoundError as e:
+    # Specific: file does not exist
+    print(f"File not found: {e.message}")
+except SplurgeSafeIoPermissionError as e:
+    # Specific: permission denied
+    print(f"Permission denied: {e.message}")
+except SplurgeSafeIoUnicodeError as e:
+    # Specific: encoding/decoding error
+    print(f"Encoding error: {e.message}")
+    # Access the original Python exception
+    original = e.__cause__
+except SplurgeSafeIoPathValidationError as e:
+    # Specific: path validation failed
+    print(f"Path validation failed: {e.error_code}")
+except SplurgeSafeIoError as e:
+    # Catch-all: any splurge-safe-io error
+    print(f"IO error ({e.error_code}): {e.message}")
+```
+
+The exception hierarchy allows you to catch errors at different levels of specificity:
+
+- **Broad catch:** `except SplurgeSafeIoError` catches all library errors
+- **Category catch:** `except SplurgeSafeIoOSError` catches file I/O errors (including FileNotFoundError, PermissionError, FileExistsError)
+- **Specific catch:** `except SplurgeSafeIoFileNotFoundError` catches only "file not found" errors
 
 ---
 

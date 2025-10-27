@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 from splurge_safe_io.exceptions import (
     SplurgeSafeIoLookupError,
     SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoUnicodeError,
 )
 from splurge_safe_io.path_validator import PathValidator
 from splurge_safe_io.safe_text_file_reader import SafeTextFileReader
@@ -110,7 +111,7 @@ def test_hypothesis_binary_encoding_roundtrip(data, enc):
         # acceptable. If it succeeds, streaming should match full read.
         try:
             full = SafeTextFileReader(tf.name, encoding=enc).read()
-        except SplurgeSafeIoLookupError:
+        except (SplurgeSafeIoLookupError, SplurgeSafeIoUnicodeError):
             return
 
         streamed = []

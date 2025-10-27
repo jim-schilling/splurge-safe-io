@@ -10,9 +10,9 @@ import pytest
 from splurge_safe_io import (
     SafeTextFileReader,
     SafeTextFileWriter,
-    SplurgeSafeIoLookupError,
     SplurgeSafeIoOSError,
     SplurgeSafeIoRuntimeError,
+    SplurgeSafeIoUnicodeError,
 )
 
 
@@ -250,7 +250,7 @@ class TestWriterExceptionHandling:
     """
 
     def test_write_unicode_encode_error(self, tmp_path):
-        """Test that UnicodeEncodeError is properly mapped to SplurgeSafeIoLookupError.
+        """Test that UnicodeEncodeError is properly mapped to SplurgeSafeIoUnicodeError.
 
         Targets line 285-286 exception handling.
         """
@@ -259,7 +259,7 @@ class TestWriterExceptionHandling:
         writer = SafeTextFileWriter(p, encoding="ascii")
 
         # Try to write content that can't be encoded in ASCII
-        with pytest.raises(SplurgeSafeIoLookupError) as exc_info:
+        with pytest.raises(SplurgeSafeIoUnicodeError) as exc_info:
             writer.write("café")  # Contains non-ASCII character
 
         assert "encoding" in str(exc_info.value).lower()
@@ -335,5 +335,5 @@ class TestWriterExceptionHandling:
         writer = SafeTextFileWriter(p, encoding="ascii")
 
         # Try to write lines with non-ASCII characters
-        with pytest.raises(SplurgeSafeIoLookupError):
+        with pytest.raises(SplurgeSafeIoUnicodeError):
             writer.writelines(["line1\n", "café\n", "line3\n"])

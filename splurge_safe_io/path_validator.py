@@ -18,7 +18,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 # Local imports
-from splurge_safe_io.exceptions import SplurgeSafeIoOSError, SplurgeSafeIoPathValidationError
+from splurge_safe_io.exceptions import (
+    SplurgeSafeIoFileNotFoundError,
+    SplurgeSafeIoOSError,
+    SplurgeSafeIoPathValidationError,
+    SplurgeSafeIoPermissionError,
+)
 
 # Module-level constants for path validation
 _MAX_PATH_LENGTH = 4096  # Maximum path length for most filesystems
@@ -57,6 +62,9 @@ class PathValidator:
             policy (Callable[[str], None]): A callable that accepts the raw
                 path string and either returns None or raises
                 :class:`SplurgeSafeIoPathValidationError`.
+
+        Raises:
+            None: This method does not raise exceptions.
         """
         cls._pre_resolution_policies.append(policy)
 
@@ -121,8 +129,9 @@ class PathValidator:
             Path: The validated and resolved Path object.
 
         Raises:
-            SplurgeSafeIoPathValidationError: If the path fails validation checks
-            SplurgeSafeIoOSError: If file existence fails or permission checks fail
+            SplurgeSafeIoPathValidationError: If the path fails validation checks.
+            SplurgeSafeIoFileNotFoundError: If file existence checks fail.
+            SplurgeSafeIoPermissionError: If permission checks fail.
         """
         # Convert to Path object
         path = Path(file_path) if isinstance(file_path, str) else file_path
@@ -176,7 +185,9 @@ class PathValidator:
         # Check if file exists
         if must_exist and not resolved_path.exists():
             raise (
-                SplurgeSafeIoOSError(error_code="file-not-found", message=f"File does not exist: {resolved_path}")
+                SplurgeSafeIoFileNotFoundError(
+                    error_code="file-not-found", message=f"File does not exist: {resolved_path}"
+                )
                 .add_suggestion("Verify the file path is correct.")
                 .add_suggestion("Create the file if it is missing.")
                 .add_suggestion("Set must_exist=False if the file is expected to be created later.")
@@ -192,7 +203,7 @@ class PathValidator:
         if must_be_readable:
             if not resolved_path.exists():
                 raise (
-                    SplurgeSafeIoOSError(
+                    SplurgeSafeIoFileNotFoundError(
                         error_code="file-not-found",
                         message=f"Cannot check readability of non-existent file: {resolved_path}",
                     )
@@ -204,7 +215,7 @@ class PathValidator:
 
             if not os.access(resolved_path, os.R_OK):
                 raise (
-                    SplurgeSafeIoOSError(
+                    SplurgeSafeIoPermissionError(
                         error_code="permission-denied", message=f"File is not readable: {resolved_path}"
                     )
                     .add_suggestion("Check file permissions.")
@@ -215,7 +226,7 @@ class PathValidator:
         if must_be_writable:
             if not resolved_path.exists():
                 raise (
-                    SplurgeSafeIoOSError(
+                    SplurgeSafeIoFileNotFoundError(
                         error_code="file-not-found",
                         message=f"Cannot check writability of non-existent file: {resolved_path}",
                     )
@@ -227,7 +238,7 @@ class PathValidator:
 
             if not os.access(resolved_path, os.W_OK):
                 raise (
-                    SplurgeSafeIoOSError(
+                    SplurgeSafeIoPermissionError(
                         error_code="permission-denied", message=f"File is not writable: {resolved_path}"
                     )
                     .add_suggestion("Check file permissions.")
@@ -312,14 +323,16 @@ class PathValidator:
 
     @classmethod
     def sanitize_filename(cls, filename: str) -> str:
-        """
-        Sanitize a filename by removing dangerous characters.
+        """Sanitize a filename by removing dangerous characters.
 
         Args:
             filename: Original filename
 
         Returns:
             Sanitized filename
+
+        Raises:
+            None: This method does not raise exceptions.
         """
         # Remove or replace dangerous characters
         sanitized = filename
@@ -342,14 +355,16 @@ class PathValidator:
 
     @classmethod
     def is_safe_path(cls, file_path: str | Path) -> bool:
-        """
-        Check if a path is safe without raising exceptions.
+        """Check if a path is safe without raising exceptions.
 
         Args:
             file_path: Path to check
 
         Returns:
             True if path is safe, False otherwise
+
+        Raises:
+            None: This method does not raise exceptions; it returns False for invalid paths.
         """
         try:
             cls.get_validated_path(file_path)

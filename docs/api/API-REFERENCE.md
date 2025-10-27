@@ -25,12 +25,14 @@ All public APIs raise exceptions defined in `splurge_safe_io.exceptions`. Each e
 
 - `SplurgeSafeIoError` — base class for all splurge-safe-io exceptions
 - `SplurgeSafeIoOSError` — OS-level errors during file operations
+- `SplurgeSafeIoFileNotFoundError` — file not found errors (subclass of `SplurgeSafeIoOSError`)
+- `SplurgeSafeIoPermissionError` — permission denied errors (subclass of `SplurgeSafeIoOSError`)
+- `SplurgeSafeIoFileExistsError` — file already exists errors (subclass of `SplurgeSafeIoOSError`)
 - `SplurgeSafeIoPathValidationError` — path validation failures
 - `SplurgeSafeIoValueError` — invalid parameter values
+- `SplurgeSafeIoUnicodeError` — text encoding/decoding errors (subclass of `SplurgeSafeIoValueError`)
 - `SplurgeSafeIoRuntimeError` — unexpected runtime conditions
-- `SplurgeSafeIoLookupError` — text encoding/decoding errors
-
-See `splurge_safe_io.exceptions` for docstrings and hierarchy.
+- `SplurgeSafeIoLookupError` — codec not found errors
 
 ---
 
@@ -38,17 +40,22 @@ See `splurge_safe_io.exceptions` for docstrings and hierarchy.
 
 The library maps builtin/os-level exceptions to the small, stable set above. The mapping is deterministic and consistent across platforms:
 
-- `FileNotFoundError` -> `SplurgeSafeIoOSError` with `error_code="file-not-found"`
-- `PermissionError` -> `SplurgeSafeIoOSError` with `error_code="permission-denied"`
-- `UnicodeDecodeError` / `UnicodeError` -> `SplurgeSafeIoLookupError` with `error_code="encoding"`
-- `UnicodeEncodeError` -> `SplurgeSafeIoLookupError` with `error_code="encoding"`
+- `FileNotFoundError` -> `SplurgeSafeIoFileNotFoundError` (subclass of `SplurgeSafeIoOSError`) with `error_code="file-not-found"`
+- `PermissionError` -> `SplurgeSafeIoPermissionError` (subclass of `SplurgeSafeIoOSError`) with `error_code="permission-denied"`
+- `FileExistsError` -> `SplurgeSafeIoFileExistsError` (subclass of `SplurgeSafeIoOSError`) with `error_code="file-exists"`
+- `UnicodeDecodeError` / `UnicodeError` -> `SplurgeSafeIoUnicodeError` with `error_code="decoding"`
+- `UnicodeEncodeError` -> `SplurgeSafeIoUnicodeError` with `error_code="encoding"`
+- `LookupError` -> `SplurgeSafeIoLookupError` with `error_code="codecs-initialization"`
 - `OSError` (unmapped) -> `SplurgeSafeIoOSError` with `error_code="general"`
+- `ValueError` -> `SplurgeSafeIoValueError` with `error_code="encoding"`
 - Any other unexpected `Exception` -> `SplurgeSafeIoRuntimeError` with `error_code="general"`
 
 **Error codes** provide semantic categorization:
 - `"file-not-found"` — file does not exist
 - `"permission-denied"` — insufficient permissions
-- `"encoding"` — text encoding/decoding error
+- `"file-exists"` — file already exists (CREATE_NEW mode)
+- `"encoding"` / `"decoding"` — text encoding/decoding error
+- `"codecs-initialization"` — codec not found
 - `"path-traversal-detected"` — path validation detected traversal attack
 - `"general"` — catch-all for unmapped OS/runtime errors
 
@@ -82,7 +89,7 @@ Description: Validate a path for safety and platform correctness and return a re
 Raises:
 - `SplurgeSafeIoPathValidationError` for validation failures
 - `SplurgeSafeIoFileNotFoundError` when `must_exist=True` and file missing
-- `SplurgeSafeIoFilePermissionError` when permissions checks fail
+- `SplurgeSafeIoPermissionError` when permissions checks fail
 
 Example:
 
@@ -206,8 +213,10 @@ Yields:
 - `list[str]`: Chunks of normalized lines (up to `chunk_size` per chunk).
 
 Raises:
-- `SplurgeSafeIoOSError`: For OS-level file I/O errors.
-- `SplurgeSafeIoLookupError`: For encoding/decoding errors.
+- `SplurgeSafeIoFileNotFoundError`: For file not found errors.
+- `SplurgeSafeIoPermissionError`: For permission errors.
+- `SplurgeSafeIoUnicodeError`: For encoding/decoding errors.
+- `SplurgeSafeIoOSError`: For other OS-level file I/O errors.
 - `SplurgeSafeIoRuntimeError`: For unexpected runtime errors.
 
 Example:
