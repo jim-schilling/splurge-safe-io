@@ -62,6 +62,9 @@ class PathValidator:
             policy (Callable[[str], None]): A callable that accepts the raw
                 path string and either returns None or raises
                 :class:`SplurgeSafeIoPathValidationError`.
+
+        Raises:
+            None: This method does not raise exceptions.
         """
         cls._pre_resolution_policies.append(policy)
 
@@ -126,9 +129,9 @@ class PathValidator:
             Path: The validated and resolved Path object.
 
         Raises:
-            SplurgeSafeIoPathValidationError: If the path fails validation checks
-            SplurgeSafeIoFileNotFoundError(SplurgeSafeIoOSError): If file existence fails
-            SplurgeSafeIoFilePermissionError(SplurgeSafeIoOSError): If permission checks fail
+            SplurgeSafeIoPathValidationError: If the path fails validation checks.
+            SplurgeSafeIoFileNotFoundError: If file existence checks fail.
+            SplurgeSafeIoPermissionError: If permission checks fail.
         """
         # Convert to Path object
         path = Path(file_path) if isinstance(file_path, str) else file_path
@@ -320,14 +323,16 @@ class PathValidator:
 
     @classmethod
     def sanitize_filename(cls, filename: str) -> str:
-        """
-        Sanitize a filename by removing dangerous characters.
+        """Sanitize a filename by removing dangerous characters.
 
         Args:
             filename: Original filename
 
         Returns:
             Sanitized filename
+
+        Raises:
+            None: This method does not raise exceptions.
         """
         # Remove or replace dangerous characters
         sanitized = filename
@@ -350,14 +355,16 @@ class PathValidator:
 
     @classmethod
     def is_safe_path(cls, file_path: str | Path) -> bool:
-        """
-        Check if a path is safe without raising exceptions.
+        """Check if a path is safe without raising exceptions.
 
         Args:
             file_path: Path to check
 
         Returns:
             True if path is safe, False otherwise
+
+        Raises:
+            None: This method does not raise exceptions; it returns False for invalid paths.
         """
         try:
             cls.get_validated_path(file_path)
