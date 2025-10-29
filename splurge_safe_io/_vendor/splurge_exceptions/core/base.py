@@ -46,17 +46,38 @@ VALID_HIERARCHICAL_PATTERN = re.compile(r"^[a-z][a-z0-9\-\.]*[a-z0-9]$")
 def _normalize_error_code(code: str | None) -> str | None:
     """Normalize error code to lowercase with dashes, no spaces/underscores/symbols.
 
+    Transforms invalid input into a normalized form automatically. Never raises
+    an exception; invalid input is always normalized or becomes None.
+
     Converts:
     - Uppercase to lowercase
     - Spaces, underscores, and symbols to dashes
     - Duplicate dashes to single dash
     - Strips leading/trailing dashes
+    - Dots to dashes (error codes cannot contain dots)
 
     Args:
         code: Raw error code string or None
 
     Returns:
-        Normalized error code or None if input is None
+        Normalized error code matching [a-z][a-z0-9-]*[a-z0-9], or None if:
+        - Input is None
+        - After normalization, only dashes remain (e.g., "---" → None)
+        - Input is empty string
+
+    Examples:
+        >>> _normalize_error_code("INVALID-VALUE")
+        'invalid-value'
+        >>> _normalize_error_code("invalid_value")
+        'invalid-value'
+        >>> _normalize_error_code("invalid.value")
+        'invalid-value'
+        >>> _normalize_error_code("INVALID_VALUE")
+        'invalid-value'
+        >>> _normalize_error_code("---")
+        None
+        >>> _normalize_error_code("")
+        None
     """
     if code is None:
         return None
@@ -80,8 +101,8 @@ class SplurgeSubclassError(Exception):
     """Raised when a SplurgeError subclass is misconfigured.
 
     This exception indicates that a subclass of SplurgeError has a missing or
-    invalid ``_domain`` class attribute, or that an invalid ``error_code`` or
-    ``_domain`` value was provided that doesn't match required patterns.
+    invalid ``_domain`` class attribute. Note: error_code values are always
+    normalized and never cause this exception.
 
     This is a framework-level error and should only occur during development or
     testing if exception subclasses are defined incorrectly. In production,
@@ -93,7 +114,7 @@ class SplurgeSubclassError(Exception):
             pass  # Missing _domain!
 
         try:
-            BrokenError(error_code="test")
+            BrokenError("Error message", error_code="test")
         except SplurgeSubclassError as e:
             print(f"Exception definition error: {e}")
     """
@@ -157,9 +178,12 @@ class SplurgeError(Exception):
 
         Args:
             message: Human-readable error message (required, primary parameter)
-            error_code: Optional semantic error identifier. Will be normalized to
-                lowercase with spaces/underscores/symbols converted to dashes.
-                If not provided, full_code will be just the domain.
+            error_code: Optional semantic error identifier. Will be automatically
+                normalized: uppercase → lowercase, spaces/underscores/symbols → dashes,
+                duplicate dashes removed, leading/trailing dashes stripped. Dots are
+                also converted to dashes. No validation error is raised; invalid input
+                is normalized instead. Examples: "INVALID-VALUE", "invalid_value",
+                "invalid.value" all normalize to "invalid-value".
             details: Optional dictionary of additional error details/context
 
         Raises:
@@ -246,8 +270,14 @@ class SplurgeError(Exception):
     def error_code(self) -> str | None:
         """Get the user-defined error code (normalized).
 
+        The error code is automatically normalized from the input provided during
+        initialization. Normalization transforms various input formats into a
+        consistent lowercase hyphen-separated format (e.g., "INVALID_VALUE" becomes
+        "invalid-value").
+
         Returns:
-            The error code (e.g., "invalid-column") or None if not provided.
+            The normalized error code (e.g., "invalid-column") or None if not
+            provided or if all transformations resulted in empty string.
         """
         return self._error_code
 
@@ -261,7 +291,7 @@ class SplurgeError(Exception):
         return self._domain
 
     @property
-    def message(self) -> str | None:
+    def message(self) -> str:
         """Get the error message.
 
         Returns:
