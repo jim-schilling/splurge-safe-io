@@ -8,7 +8,7 @@ alwaysApply: false
 - Prefer | instead of Optional or Union.
 - Code concise, technical, Python that adheres to PEP 8, PEP 604, and PEP 585.
 - Code to modern Python standards targeting version 3.10 or later.
-- Use absolute import paths, where appropriate.
+- Use relative import paths, where appropriate.
 - When possible, place imports at top of module.
 - Group and sort imports: standard libraries, then third-party libraries, then local libraries. Sort alphabetically within each group.
 - Use separate statements for multiple context managers instead of nesting them.

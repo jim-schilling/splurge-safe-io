@@ -1,5 +1,18 @@
 ## Changelog
 
+###  [2025.4.0] - 2025-10-29
+
+#### Changed
+- Bumped package version to `2025.4.0` in `pyproject.toml` and exposed `__version__ = "2025.4.0"` in `splurge_safe_io/__init__.py`.
+
+#### Added
+- Vendored `splurge-exceptions` package into `splurge_safe_io/_vendor/splurge_exceptions/` to reduce external dependencies and improve package stability.
+- Added `cli.py` and `__main__.py` for command-line interface support, allowing users to run `python -m splurge_safe_io` to access package metadata and functionality.
+
+#### Removed
+- Removed dependency on `splurge-exceptions` package by vendoring necessary exception classes directly into `splurge_safe_io/_vendor/splurge_exceptions/`. This change simplifies dependency management and ensures tighter integration with the Splurge ecosystem.
+- Updated all exception imports and references throughout the codebase to use the vendored exceptions instead of the external package.
+
 ### [2025.3.0] - 2025-10-27
 
 #### Refactored/Fixed

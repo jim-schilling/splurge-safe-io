@@ -25,8 +25,8 @@ from enum import Enum
 from pathlib import Path
 from typing import cast
 
-from splurge_safe_io.constants import CANONICAL_NEWLINE, DEFAULT_ENCODING
-from splurge_safe_io.exceptions import (
+from .constants import CANONICAL_NEWLINE, DEFAULT_ENCODING
+from .exceptions import (
     SplurgeSafeIoFileExistsError,
     SplurgeSafeIoOSError,
     SplurgeSafeIoPermissionError,
@@ -34,7 +34,7 @@ from splurge_safe_io.exceptions import (
     SplurgeSafeIoUnicodeError,
     SplurgeSafeIoValueError,
 )
-from splurge_safe_io.path_validator import PathValidator
+from .path_validator import PathValidator
 
 
 class TextFileWriteMode(Enum):
