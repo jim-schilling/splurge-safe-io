@@ -1,5 +1,11 @@
 ## Changelog
 
+### [2025.4.1] - 2025-10-29
+
+#### Updated
+- Bump package version to `2025.4.1` in `pyproject.toml` and expose `__version__ = "2025.4.1"` in `splurge_safe_io/__init__.py`.
+- Upgraded `splurge-exceptions` vendored code to latest version `2025.4.1` in `splurge_safe_io/_vendor/splurge_exceptions/` to incorporate recent fixes and improvements from the upstream package.
+
 ###  [2025.4.0] - 2025-10-29
 
 #### Changed
