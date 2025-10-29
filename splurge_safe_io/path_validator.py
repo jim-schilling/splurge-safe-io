@@ -18,7 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 # Local imports
-from splurge_safe_io.exceptions import (
+from .exceptions import (
     SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoOSError,
     SplurgeSafeIoPathValidationError,

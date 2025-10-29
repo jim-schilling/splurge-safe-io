@@ -20,7 +20,7 @@ License: MIT
 Copyright (c) 2025 Jim Schilling
 """
 
-from splurge_exceptions import SplurgeFrameworkError  # type: ignore[import]
+from ._vendor.splurge_exceptions import SplurgeFrameworkError  # type: ignore[import]
 
 
 class SplurgeSafeIoError(SplurgeFrameworkError):

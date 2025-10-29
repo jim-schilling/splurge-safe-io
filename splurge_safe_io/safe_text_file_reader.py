@@ -31,7 +31,7 @@ from contextlib import contextmanager
 from io import StringIO
 from pathlib import Path
 
-from splurge_safe_io.constants import (
+from .constants import (
     CANONICAL_NEWLINE,
     DEFAULT_BUFFER_SIZE,
     DEFAULT_CHUNK_SIZE,
@@ -40,7 +40,7 @@ from splurge_safe_io.constants import (
     MIN_BUFFER_SIZE,
     MIN_CHUNK_SIZE,
 )
-from splurge_safe_io.exceptions import (
+from .exceptions import (
     SplurgeSafeIoFileNotFoundError,
     SplurgeSafeIoLookupError,
     SplurgeSafeIoOSError,
@@ -49,7 +49,7 @@ from splurge_safe_io.exceptions import (
     SplurgeSafeIoUnicodeError,
     SplurgeSafeIoValueError,
 )
-from splurge_safe_io.path_validator import PathValidator
+from .path_validator import PathValidator
 
 
 class SafeTextFileReader:
