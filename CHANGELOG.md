@@ -1,5 +1,18 @@
 ## Changelog
 
+### [2025.4.2] - 2025-10-30
+
+#### Updated
+- Bump package version to `2025.4.2` in `pyproject.toml` and expose `__version__ = "2025.4.2"` in `splurge_safe_io/__init__.py`.
+- Upgraded `splurge-exceptions` vendored code to latest version `2025.3.1`
+- Updated mypy configuration in `pyproject.toml`.
+- Updated pre-commit mypy run cli option in `.pre-commit-config.yaml`.
+- Update `ci-lint-and-typecheck.yml` mypy run cli option in `.github/workflows/ci-lint-and-typecheck.yml`.
+
+### Added
+- Added `__init__.py` to `examples/` directory for mypy compatibility.
+- Added `__init__.py` modules to `tests/*` directories for mypy compatibility.
+
 ### [2025.4.1] - 2025-10-29
 
 #### Updated
