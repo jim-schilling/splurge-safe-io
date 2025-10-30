@@ -11,7 +11,7 @@ repos:
 
       - id: system-mypy
         name: System Mypy
-        entry: mypy splurge_safe_io
+        entry: mypy .
         language: system
         pass_filenames: false
         stages: [pre-commit]
