@@ -1,5 +1,13 @@
 ## Changelog
 
+### [2025.4.3] - 2025-10-31
+
+#### Fixed 
+- Corrected the docstrings in `safe_text_file_reader.py` to specify `SplurgeSafeIoPermissionError' vs incorrect `SplurgeSafeIoFilePermissionError`.
+
+#### Added
+- Added `__init__.py` to `examples/` directory for mypy compatibility.
+
 ### [2025.4.2] - 2025-10-30
 
 #### Updated
